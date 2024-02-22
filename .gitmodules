@@ -1,3 +1,6 @@
 [submodule "llvm-project"]
 	path = llvm-project
 	url = https://github.com/llvm/llvm-project
+[submodule "pybind11"]
+	path = pybind11
+	url = https://github.com/RosettaCommons/pybind11.git

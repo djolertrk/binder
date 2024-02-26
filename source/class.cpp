@@ -290,10 +290,9 @@ bool is_bindable_raw(clang::CXXRecordDecl const *C)
 				if( not is_std_function_bindable(C) ) return false;
 			}
 			else {
-				if( ts->getPointOfInstantiation() /* SourceLocation */.isInvalid() and not is_python_builtin(C) ) {
-					// outs() << "is_bindable( " << qualified_name << " " << class_qualified_name(C) << " ): no point of instantiation  found, skipping...\n";
-					return false;
-				}
+				//if( ts->getPointOfInstantiation() /* SourceLocation */.isInvalid() and not is_python_builtin(C) ) {
+				  // outs() << "is_bindable( " << qualified_name << " " << class_qualified_name(C) << " ): no point of instantiation  found, skipping...\n";
+				return true;
 			}
 		}
 		else return false;
@@ -613,6 +612,10 @@ bool is_callback_structure_needed(CXXRecordDecl const *C)
 {
 	// C->dump();
 
+	// Instantiation delayed.
+	if (!C->getDefinition())
+		return false;
+
 	// check if all pure-virtual methods could be overridden in Python
 	if( C->isAbstract() ) {
 		for( auto m = C->method_begin(); m != C->method_end(); ++m ) {
@@ -642,6 +645,10 @@ bool is_callback_structure_needed(CXXRecordDecl const *C)
 // Check if call-back structure that we can create will be constructible
 bool is_callback_structure_constructible(CXXRecordDecl const *C)
 {
+	// Instantiation delayed.
+	if (!C->getDefinition())
+		return false;
+
 	if( C->isAbstract() ) {
 		for( auto m = C->method_begin(); m != C->method_end(); ++m ) {
 			if( m->isPure() and !isa<CXXConstructorDecl>(*m) and (m->getAccess() == AS_private or !is_bindable(*m) or is_skipping_requested(*m, Config::get())) ) return false;
@@ -887,7 +894,7 @@ string binding_template_bases(CXXRecordDecl const *C, bool callback_structure, b
 {
 	string c;
 
-	if( dyn_cast<ClassTemplateSpecializationDecl>(C) ) { // for template classes explicitly bind data members and member functions from public base classes
+	if( dyn_cast<ClassTemplateSpecializationDecl>(C) and C->getDefinition()) { // for template classes explicitly bind data members and member functions from public base classes
 		for( auto b = C->bases_begin(); b != C->bases_end(); ++b ) {
 			if( b->getAccessSpecifier() == AS_public and !b->isVirtual() ) {
 				if( auto rt = dyn_cast<RecordType>(b->getType().getCanonicalType().getTypePtr()) ) {
@@ -938,6 +945,9 @@ string bind_forward_declaration(CXXRecordDecl const *C, Context &context)
 string ClassBinder::maybe_base_classes(Context &context)
 {
 	string r;
+
+	if (!C->getDefinition())
+		return r;
 
 	static std::vector<string> const skip_list = {"std::enable_shared_from_this", "std::string", "std::basic_string", "std::pair", "std::tuple"};
 
@@ -1273,7 +1283,7 @@ void ClassBinder::bind(Context &context)
 
 	// if( C->isAbstract()  and  callback_structure) c += "\tcl.def(pybind11::init<>());\n";
 
-	if( (!C->isAbstract() or callback_structure_constructible) and named_class ) {
+	if( (C->getDefinition() and !C->isAbstract() or callback_structure_constructible) and named_class ) {
 		bool default_constructor_processed = false;
 		// bool copy_constructor_processed = false;
 

@@ -1,7 +1,3 @@
-
-#list(REMOVE_ITEM CMAKE_CXX_FLAGS "-fno-exceptions")
-#set(CMAKE_CXX_FLAGS "-fexceptions ${CMAKE_CXX_FLAGS}")
-
 set(LLVM_LINK_COMPONENTS support)
 set(LLVM_USED_LIBS clangTooling clangBasic clangAST)
 
@@ -40,9 +36,11 @@ add_clang_executable(binder
   fmt/os.cc
   fmt/os.h
   )
+
 if (NOT VERSION)
   set(VERSION 1.4.1)
 endif()  
+
 target_compile_definitions(binder PUBLIC BINDER_VERSION_STRING=\"${VERSION}\")
 if(USE_EXTERNAL_LLVM)
   if(STATIC)
@@ -63,12 +61,15 @@ if(USE_EXTERNAL_LLVM)
                                )
      endif()
   endif()
+
   add_definitions(${LLVM_DEFINITIONS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_COMPILE_FLAGS}")
   list(REMOVE_ITEM CMAKE_CXX_FLAGS "-fno-exceptions")
   string (REPLACE "-fno-exceptions" ""     CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+
   message(STATUS "binder: lib_llvm_path=${lib_llvm_path}")
   message(STATUS "binder: CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
+
   if ( (LLVM_VERSION_MAJOR GREATER 3)  AND (LLVM_VERSION_MAJOR LESS 8) )
     target_link_libraries(binder
       PRIVATE
@@ -123,6 +124,7 @@ else()
     clangFrontend
     )
 endif()
+
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/binder
 PERMISSIONS WORLD_EXECUTE WORLD_READ OWNER_WRITE OWNER_READ OWNER_EXECUTE
 DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,0 +1,4 @@
+// RUN: touch %s.include
+// RUN: echo "#include <%s.hpp>" > %s.include
+// RUN: binder --root-module %s --single-file --annotate-includes %s.config %s.include -- -x c++ -std=c++11 -I./ -I/usr/include/python3.10/
+// RUN: diff %s.cpp %s.ref.cpp

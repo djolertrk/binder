@@ -72,7 +72,10 @@ std::string bind_forward_declaration(clang::CXXRecordDecl const *C, Context &);
 class ClassBinder : public Binder
 {
 public:
-	ClassBinder(clang::CXXRecordDecl const *c) : C(c) {}
+	ClassBinder(clang::CXXRecordDecl const *c) : C(c) {
+//		c->dump();
+
+	}
 
 	/// Generate string id that uniquely identify C++ binding object. For functions this is function prototype and for classes forward declaration.
 	string id() const override;

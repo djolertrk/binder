@@ -216,6 +216,21 @@ std::set<string> Context::create_all_nested_namespaces()
 	vector<string> namespaces;
 
 	for( auto &b : binders ) {
+
+		auto cxx = b->named_decl();
+		if( cxx) {
+			auto cxxrecord = dyn_cast<CXXRecordDecl>(cxx);
+			if( cxxrecord ) {
+				auto parentContext = cxxrecord->getDeclContext();
+				if( parentContext ) {
+					auto parentCxxRecord = dyn_cast<CXXRecordDecl>(parentContext);
+					if( parentCxxRecord ) {
+						continue;
+					}
+				}
+			}
+		}
+
 		if( b->code().size() ) {
 			string ns = namespace_from_named_decl(b->named_decl());
 
@@ -290,7 +305,7 @@ void Context::sort_binders()
 				std::vector<CXXRecordDecl const *> const dependencies = (*b)->dependencies();
 				for( auto &c : dependencies ) {
 					if( !is_forward_needed(c) ) continue;
-					// outs() << "Pushing forward binding for " << class_qualified_name(c) << "...\n";
+					outs() << "Pushing forward binding for " << class_qualified_name(c) << "...\n";
 					auto e = find_if(b, binders.end(), [&c](BinderOP const &p) -> bool { return dyn_cast<CXXRecordDecl const >(p->named_decl()) == c; });
 					if( e == binders.end() ) {
 						if( !repeat ) {
@@ -334,12 +349,31 @@ void Context::generate(Config const &config)
 
 	string root_module_full_file_name = config.prefix + '/' + root_module_file_name;
 	std::ofstream root_module_file_handle(root_module_full_file_name);
-	if( root_module_file_handle.fail() ) throw std::runtime_error("ERROR: Can not open file " + root_module_full_file_name + " for writing...");
+	if( root_module_file_handle.fail() ) {		
+		outs() << "ERROR: Can not open file " + root_module_full_file_name + " for writing...\n";
+		assert(false && "Can not open file for writing...");
+//		throw std::runtime_error("ERROR: Can not open file " + root_module_full_file_name + " for writing...");
+	}
 
 	sort_binders();
 
 	outs() << "Writing code...\n";
 	for( uint i = 0; i < binders.size(); ++i ) {
+//		/* AADC
+		auto cxx = binders[i]->named_decl();
+		if( cxx) {
+			auto cxxrecord = dyn_cast<CXXRecordDecl>(cxx);
+			if( cxxrecord ) {
+				auto parentContext = cxxrecord->getDeclContext();
+				if( parentContext ) {
+					auto parentCxxRecord = dyn_cast<CXXRecordDecl>(parentContext);
+					if( parentCxxRecord ) {
+						continue;
+					}
+				}
+			}
+		}
+//		*/
 		if( binders[i]->code().empty() ) continue;
 
 		string np, file_name;

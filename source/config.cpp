@@ -36,7 +36,11 @@ std::pair<string, string> split_in_two(string const &s, string const &error_stri
 
 	size_t split = std::min(space, tab);
 
-	if( split == string::npos ) throw std::runtime_error(error_string);
+	if( split == string::npos ) {
+		outs() << "Error: " << error_string << "\n";
+		assert(false);
+	//	throw std::runtime_error(error_string);
+	}
 	else return std::make_pair(s.substr(0, split), s.substr(split + 1));
 }
 
@@ -97,7 +101,11 @@ void Config::read(string const &file_name)
 
 	std::ifstream f(file_name);
 
-	if( not f.good() ) { throw std::runtime_error("can not open file " + file_name + " for reading..."); }
+	if( not f.good() ) { 
+		outs() << "ERROR: Can not open file " << file_name << " for reading...\n";
+		assert(false);
+		//throw std::runtime_error("can not open file " + file_name + " for reading..."); 
+	}
 
 	string line;
 
@@ -109,10 +117,18 @@ void Config::read(string const &file_name)
 			if( line.empty() ) continue;
 		}
 
-		if( line[0] != '+' and line[0] != '-' ) throw std::runtime_error("Invalid token at the begining of line in config file! Each line should begin with ether '+' or '-' or '#'! Line: " + line);
+		if( line[0] != '+' and line[0] != '-' ) {
+			outs() << "Error: Invalid token at the begining of line in config file! Each line should begin with ether '+' or '-' or '#'! Line: " << line << "\n";
+			assert(false);
+		//	throw std::runtime_error("Invalid token at the begining of line in config file! Each line should begin with ether '+' or '-' or '#'! Line: " + line);
+		}
+		outs() << "line: " << line << "\n";
 		size_t space = line.find(' ');
-		if( space == string::npos )
-			throw std::runtime_error("Invalid line in config file! Each line must have token separated with space from object name. For example: '+function aaa::bb::my_function'. Line: " + line);
+		if( space == string::npos ) {
+			outs() << "Error: Invalid line in config file! Each line must have token separated with space from object name. For example: '+function aaa::bb::my_function'. Line: " << line << "\n";	
+			assert(false);
+			//throw std::runtime_error("Invalid line in config file! Each line must have token separated with space from object name. For example: '+function aaa::bb::my_function'. Line: " + line);
+		}
 
 		bool bind = line[0] == '+' ? true : false;
 		string token = line.substr(1, space - 1);
@@ -159,7 +175,9 @@ void Config::read(string const &file_name)
 				class_includes_[class_and_include.first].push_back(class_and_include.second);
 			}
 			else {
-				throw std::runtime_error("include_for_class must be '+' configuration.");
+				outs() << "Error: include_for_class must be '+' configuration. Line: " << line << "\n";
+				assert(false);
+				//throw std::runtime_error("include_for_class must be '+' configuration.");
 			}
 		}
 		else if( token == _include_for_namespace_ ) {
@@ -169,7 +187,9 @@ void Config::read(string const &file_name)
 				namespace_includes_[namespace_and_include.first].push_back(namespace_and_include.second);
 			}
 			else {
-				throw std::runtime_error("include_for_namespace must be '+' configuration.");
+				outs() << "Error: include_for_namespace must be '+' configuration. Line: " << line << "\n";
+				assert(false);
+				//throw std::runtime_error("include_for_namespace must be '+' configuration.");
 			}
 		}
 		else if( token == _buffer_protocol_ ) {
@@ -249,8 +269,11 @@ void Config::read(string const &file_name)
 		}
 
 		else {
-			throw std::runtime_error("Invalid token in config file! Each token must be either: namespace, class or function! For example: '+function aaa::bb::my_function'. Token: '" + token +
-									 "' Line: '" + line + '\'');
+			outs() << "Error: Invalid token in config file! Each token must be either: namespace, class or function! For example: '+function aaa::bb::my_function'. Token: '" + token +
+									 "' Line: '" + line + '\'' << "\n";
+			assert(false);
+//			throw std::runtime_error("Invalid token in config file! Each token must be either: namespace, class or function! For example: '+function aaa::bb::my_function'. Token: '" + token +
+//									 "' Line: '" + line + '\'');
 		}
 	}
 }
@@ -283,8 +306,11 @@ bool Config::is_namespace_binding_requested(string const &namespace_) const
 	if( to_bind.size() > to_skip.size() ) return true;
 	if( to_bind.size() < to_skip.size() ) return false;
 
-	if( to_bind_flag and to_skip_flag )
-		throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should be binded or not... please check if options --bind and --skip conflicting!!!");
+	if( to_bind_flag and to_skip_flag ) {
+		outs() << "Could not determent if namespace '" << namespace_ << "' should be binded or not... please check if options --bind and --skip conflicting!!!\n";
+		assert(false);
+	}
+		// throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should be binded or not... please check if options --bind and --skip conflicting!!!");
 
 	if( to_bind_flag ) return true;
 
@@ -317,8 +343,11 @@ bool Config::is_namespace_skipping_requested(string const &namespace_) const
 	if( to_bind.size() > to_skip.size() ) return false;
 	if( to_bind.size() < to_skip.size() ) return true;
 
-	if( to_bind_flag and to_skip_flag )
-		throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should be binded or not... please check if options --bind and --skip conflicting!!!");
+	if( to_bind_flag and to_skip_flag ) {
+		outs() << "Could not determent if namespace '" << namespace_ << "' should be binded or not... please check if options --bind and --skip conflicting!!!\n";
+		assert(false);
+	}
+		// throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should be binded or not... please check if options --bind and --skip conflicting!!!");
 
 	if( to_skip_flag ) return true;
 
@@ -363,6 +392,8 @@ bool Config::is_class_binding_requested(string const &class__) const
 	auto bind = std::find(classes_to_bind.begin(), classes_to_bind.end(), class_);
 
 	if( bind != classes_to_bind.end() ) return true;
+
+	if (class_.rfind("std::shared_ptr<QuantLib::", 0) == 0) return true;
 
 	return false;
 }
@@ -450,7 +481,9 @@ bool Config::is_module_local_requested(string const &namespace_) const
 	if( module_local_to_add != module_local_namespaces_to_add.end()) {
 		auto module_local_to_skip = std::find(module_local_namespaces_to_skip.begin(), module_local_namespaces_to_skip.end(), namespace_);
 		if( module_local_to_skip != module_local_namespaces_to_skip.end()) {
-			throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should use module_local or not... please resolve the conlficting options +module_local_namespace and -module_local_namespace!!!");
+			outs() << "Could not determent if namespace '" << namespace_ << "' should use module_local or not... please resolve the conlficting options +module_local_namespace and -module_local_namespace!!!\n";
+			assert(false);
+			//throw std::runtime_error("Could not determent if namespace '" + namespace_ + "' should use module_local or not... please resolve the conlficting options +module_local_namespace and -module_local_namespace!!!");
 		}
 		return true;
 	}

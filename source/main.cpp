@@ -61,7 +61,7 @@ public:
 	virtual bool VisitEnumDecl(EnumDecl *record)
 	{
 		errs() << "ClassVisitor EnumDecl: " << record->getQualifiedNameAsString() << "\n";
-		record->dump();
+//		record->dump();
 		return true;
 	}
 
@@ -125,7 +125,11 @@ public:
 
 	virtual bool VisitCXXRecordDecl(CXXRecordDecl *C)
 	{
-		if( C->isCXXInstanceMember() or C->isCXXClassMember() ) return true;
+//		C->dump();
+		bool inner_class = C->isClass() && C->isCXXClassMember();
+//		outs() << "Visit CXXRecordDecl: " << C->getQualifiedNameAsString() << "  isCXXClassMember: " << C->isCXXClassMember() << "  isCXXInstanceMember: " << C->isCXXInstanceMember() << "  isClass: " << C->isClass() << "  isDependent: " << C->isDependentType() << "  isInjectedClassName: " << C->isInjectedClassName() 
+//		<< "inner_class : " << inner_class << "\n";
+		if( !inner_class && (C->isCXXInstanceMember() or C->isCXXClassMember()) ) return true;
 
 		if( binder::is_bindable(C) ) {
 			binder::BinderOP b = std::make_shared<binder::ClassBinder>(C);

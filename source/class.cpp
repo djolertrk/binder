@@ -1289,6 +1289,8 @@ void ClassBinder::bind(Context &context)
 
 		string constructors;
 		for( auto t = C->ctor_begin(); t != C->ctor_end(); ++t ) {
+			const auto& ctor = *t;
+			if (ctor->isDeleted()) continue;
 			if( t->getAccess() == AS_public and !t->isMoveConstructor() and is_bindable(*t) and !is_skipping_requested(*t, Config::get()) /*and  t->doesThisDeclarationHaveABody()*/ ) {
 				ConstructorBindingInfo CBI = {C, *t, trampoline, qualified_name, trampoline_name, context};
 
@@ -1332,8 +1334,12 @@ void ClassBinder::bind(Context &context)
 
 		// c += "\t// hasDefaultConstructor={} needsImplicitDefaultConstructor={} base_default_default_constructor_available={}\n"_format(C->hasDefaultConstructor(),
 		// C->needsImplicitDefaultConstructor(), base_default_default_constructor_available(C));
+//		C->isStruct() && C->hasDefaultConstructor()
 
 		if( !default_constructor_processed and C->needsImplicitDefaultConstructor() and base_default_default_constructor_available(C)
+			and !C->isStruct() // AADC Disable default constructor for struct
+							   // AADC to implement this properly we need to if
+							   // AADC there are any const data members.
 			// ( C->ctor_begin() == C->ctor_end() and  is_default_default_constructor_available(C)  and  !default_constructor_processed)
 			// or (C->hasDefaultConstructor()  and  !default_constructor_processed )
 
@@ -1342,7 +1348,7 @@ void ClassBinder::bind(Context &context)
 
 			/*and  !C->needsImplicitDefaultConstructor() and !C->hasNonTrivialDefaultConstructor()*/
 		) { // No constructors defined, adding default constructor
-
+			
 			// c += "\tcl.def(pybind11::init<>());__\n";  // making sure that default is appering first
 			c += bind_default_constructor(ConstructorBindingInfo{C, nullptr, trampoline, qualified_name, trampoline_name, context}); // making sure that default is appering first
 		}

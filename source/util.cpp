@@ -144,7 +144,11 @@ void update_source_file(std::string const &prefix, std::string const &file_name,
 	if( old_code != code ) {
 		if( O_verbose ) outs() << "Writing " << full_file_name << "\n";
 		std::ofstream f(full_file_name);
-		if( f.fail() ) throw std::runtime_error("ERROR: Can not open file " + full_file_name + " for writing...");
+		if( f.fail() ) {
+			outs() << "ERROR: Can not open file " << full_file_name << " for writing...\n";
+			assert(false);
+		//	throw std::runtime_error("ERROR: Can not open file " + full_file_name + " for writing...");
+		}
 		f << code;
 	}
 	else {

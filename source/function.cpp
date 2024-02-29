@@ -513,8 +513,15 @@ bool is_bindable_raw(FunctionDecl const *F)
 	bool r = !F->isDeleted(); //  and  !F->isVariadic(); disabled, instead we force bindings with lambda for variadic
 
 	if( F->isOverloadedOperator() ) {
-		// outs() << "Operator: " << F->getNameAsString() << '\n';
-		if( !isa<CXXMethodDecl>(F) or (cpp_python_operator(*F).size() == 0) ) return false;
+		bool isFriend = false;
+		if (F->isFriend()) {
+			// outs() << "Skipping a function marked as friend: " << F->getNameAsString() << '\n';
+			isFriend = true;
+		}
+
+		if(isFriend or (cpp_python_operator(*F).size() == 0)) {
+			return false;
+		}
 	}
 
 	r &= F->getTemplatedKind() != FunctionDecl::TK_FunctionTemplate /*and  !F->isOverloadedOperator()*/ and !isa<CXXConversionDecl>(F) and !F->isDeleted();

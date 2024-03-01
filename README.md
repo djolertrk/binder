@@ -47,7 +47,7 @@ $ make -j4
 
 ```
 $ mkdir build && cd build
-$ cmake -G "Ninja" ../binder -DCMAKE_MODULE_PATH="$PWD/../build_llvm/" -DClang_DIR="$PWD/../build_llvm/lib/cmake/clang" -Dpybind11_DIR="$PWD/../build_pybind11/"
+$ cmake -G "Ninja" ../binder -DCMAKE_MODULE_PATH="$PWD/../build_llvm/" -DCLANG_DIR="$PWD/../build_llvm/lib/cmake/clang" -Dpybind11_DIR="$PWD/../build_pybind11/" -DBINDER_ENABLE_TEST=OFF
 $ ninja binder
 ```
 

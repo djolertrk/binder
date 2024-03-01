@@ -1,5 +1,3 @@
-// -*- mode:c++;tab-width:2;indent-tabs-mode:t;show-trailing-whitespace:t;rm-trailing-spaces:t -*-
-// vi: set ts=2 noet:
 //
 // Copyright (c) 2016 Sergey Lyskov <sergey.lyskov@jhu.edu>
 //
@@ -12,7 +10,6 @@
 
 #ifndef _INCLUDED_options_hpp_
 #define _INCLUDED_options_hpp_
-
 
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/CommandLine.h"

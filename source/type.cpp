@@ -400,20 +400,20 @@ void add_relevant_include_for_decl(
 }
 
 /// extract include needed for this generator and add it to includes vector
-void add_relevant_includes(QualType const &qt,
+void add_relevant_includes(Context &context, QualType const &qt,
                            /*const ASTContext &context,*/ IncludeSet &includes,
                            int level) {
   // QualType qt = qt.getDesugaredType(context);
   // outs() << "add_relevant_includes(qt): " << qt.getAsString() << "\n";
   if (clang::PointerType const *pt =
           dyn_cast<clang::PointerType>(qt.getTypePtr()))
-    add_relevant_includes(pt->getPointeeType(), includes, level);
+    add_relevant_includes(context, pt->getPointeeType(), includes, level);
   if (ReferenceType const *rt = dyn_cast<ReferenceType>(qt.getTypePtr()))
-    add_relevant_includes(rt->getPointeeType(), includes, level);
+    add_relevant_includes(context, rt->getPointeeType(), includes, level);
   if (CXXRecordDecl *r = qt->getAsCXXRecordDecl())
-    add_relevant_includes(r, includes, level);
+    add_relevant_includes(context, r, includes, level);
   if (EnumDecl *e = dyn_cast_or_null<EnumDecl>(qt->getAsTagDecl()))
-    add_relevant_includes(e, includes, level);
+    add_relevant_includes(context, e, includes, level);
 }
 
 // check if given QualType is bindable
@@ -927,7 +927,7 @@ bool is_banned_symbol(clang::NamedDecl const *D) {
 
 // 		 "std::_Rb_tree_iterator", "std::_Rb_tree_const_iterator",
 // "__gnu_cxx::__normal_iterator", 		 "std::_List_iterator",
-// "std::_List_const_iterator", 		 "std::__detail::_Node_iterator",
+// "std::_List_const_iterator", "std::__detail::_Node_iterator",
 // "std::__detail::_Node_iterator_base", "std::__detail::_Node_const_iterator",
 // 		 "std::_Deque_iterator",
 

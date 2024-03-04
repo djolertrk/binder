@@ -20,8 +20,8 @@
 namespace binder {
 
 /// extract include needed for this generator and add it to includes vector
-void add_relevant_includes(clang::EnumDecl const *E, IncludeSet &includes,
-                           int level);
+void add_relevant_includes(Context &context, clang::EnumDecl const *E,
+                           IncludeSet &includes, int level);
 
 /// check if generator can create binding
 bool is_bindable(clang::EnumDecl const *E);
@@ -48,13 +48,14 @@ public:
   clang::NamedDecl const *named_decl() const override { return E; };
 
   /// check if generator can create binding
-  bool bindable() const override;
+  bool bindable(Context &) const override;
 
   /// check if user requested binding for the given declaration
   virtual void request_bindings_and_skipping(Config const &) override;
 
   /// extract include needed for this generator and add it to includes vector
-  void add_relevant_includes(IncludeSet &includes) const override;
+  void add_relevant_includes(Context &context,
+                             IncludeSet &includes) const override;
 
   /// generate binding code for this object and all its dependencies
   void bind(Context &) override;

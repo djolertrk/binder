@@ -167,6 +167,19 @@ void Context::add_insertion_operator(clang::FunctionDecl const *F) {
   insertion_operators[function_pointer_type(F)] = F;
 }
 
+void Context::add_global_operator_to_class_scope(clang::CXXRecordDecl const *R,
+                                                 clang::FunctionDecl const *F) {
+  ClassGlobalOperators[R].push_back(F);
+}
+
+std::optional<std::vector<clang::FunctionDecl const *>>
+Context::get_global_operators(const clang::CXXRecordDecl *D) {
+  if (ClassGlobalOperators.count(D)) {
+    return ClassGlobalOperators[D];
+  }
+  return std::nullopt;
+}
+
 /// find global insertion operator for given type, return nullptr if not such
 /// operator find
 clang::FunctionDecl const *
@@ -267,7 +280,7 @@ std::string Context::module_variable_name(std::string const &namespace_) {
 // find binder related to given object name and bind it
 void Context::request_bindings(std::string const &type) {
   if (types.count(type) and !types[type]->is_binded() and
-      types[type]->bindable() and !types[type]->skipping_requested() and
+      types[type]->bindable(*this) and !types[type]->skipping_requested() and
       !is_python_builtin(types[type]->named_decl())) {
     types[type]->request_bindings();
   }
@@ -277,7 +290,7 @@ void Context::request_bindings(std::string const &type) {
 void Context::bind(Config const &config) {
   for (auto &sp : binders) {
     Binder &b(*sp);
-    if (!b.is_in_system_header() and b.bindable())
+    if (!b.is_in_system_header() and b.bindable(*this))
       b.request_bindings_and_skipping(config);
   }
 
@@ -290,7 +303,7 @@ void Context::bind(Config const &config) {
 
     for (auto &sp : binders) {
       Binder &b(*sp);
-      if (!b.is_binded() and b.bindable() and b.binding_requested()) {
+      if (!b.is_binded() and b.bindable(*this) and b.binding_requested()) {
         if (O_verbose)
           outs() << "Binding: "
                  << b.id() /*named_decl()->getQualifiedNameAsString()*/ << "\n";
@@ -380,7 +393,7 @@ void Context::generate(Config const &config) {
                   " for writing...\n";
     assert(false && "Can not open file for writing...");
     //		throw std::runtime_error("ERROR: Can not open file " +
-    //root_module_full_file_name + " for writing...");
+    // root_module_full_file_name + " for writing...");
   }
 
   sort_binders();
@@ -467,11 +480,11 @@ void Context::generate(Config const &config) {
       // outs() << "Binding: " << string(*binders[i]) << "\n";
       //  if( ClassBinder * CB = dynamic_cast<ClassBinder*>( binders[i].get() )
       //  ) { 	std::vector<clang::CXXRecordDecl const *> const dependencies =
-      //  CB->dependencies(); 	for(auto & c : dependencies ) { 		if(
-      //  is_forward_needed(c) ) { 			code += bind_forward_declaration(c, *this);
-      //  			add_to_binded(c);
-      //  			outs() << "Adding forward binding for " <<
-      //  class_qualified_name(c) << "\n";
+      //  CB->dependencies(); 	for(auto & c : dependencies ) {
+      //  if(
+      //  is_forward_needed(c) ) { 			code +=
+      //  bind_forward_declaration(c, *this); 			add_to_binded(c); 			outs() <<
+      //  "Adding forward binding for " << class_qualified_name(c) << "\n";
       //  		}
       //  	}
       //  	add_to_binded( dynamic_cast<CXXRecordDecl*>( CB->named_decl() )
@@ -481,10 +494,13 @@ void Context::generate(Config const &config) {
       // if( CXXRecordDecl const *C = dyn_cast<CXXRecordDecl const >(
       // binders[i]->named_decl() ) ) { // right not only query dependency if we
       // dealing with class 	std::vector<clang::CXXRecordDecl const *> const
-      // dependencies = binders[i]->dependencies(); 	for(auto & c : dependencies
-      // ) { 		if( is_forward_needed(c) ) { 			code += bind_forward_declaration(c,
-      // *this); 			add_to_binded(c); 			outs() << "Adding forward binding for " <<
-      // class_qualified_name(c) << "\n";
+      // dependencies = binders[i]->dependencies(); 	for(auto & c :
+      // dependencies
+      // ) { 		if( is_forward_needed(c) ) { code +=
+      // bind_forward_declaration(c,
+      // *this); 			add_to_binded(c);
+      // outs() << "Adding forward binding for " << class_qualified_name(c) <<
+      // "\n";
       // 		}
       // 	}
       // 	add_to_binded(C);
@@ -503,7 +519,7 @@ void Context::generate(Config const &config) {
       string generated_code = binders[i]->code();
       if (generated_code.size()) {
         code += generated_code;
-        binders[i]->add_relevant_includes(includes);
+        binders[i]->add_relevant_includes(*this, includes);
       }
     }
 

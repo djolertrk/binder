@@ -47,6 +47,12 @@ public:
   /// generate unique trace line containing `info` to insert into the code
   std::string trace_line(std::string const &info);
 
+  void add_global_operator_to_class_scope(clang::CXXRecordDecl const *,
+                                          clang::FunctionDecl const *);
+
+  std::optional<std::vector<clang::FunctionDecl const *>>
+  get_global_operators(const clang::CXXRecordDecl *D);
+
 private:
   /// bind all objects residing in namespaces and their dependencies
   void bind(Config const &config);
@@ -77,6 +83,10 @@ private:
 
   /// set of items unique id's to keep track of what is binded and not
   std::set<string> binded;
+
+  std::unordered_map<clang::CXXRecordDecl const *,
+                     std::vector<clang::FunctionDecl const *>>
+      ClassGlobalOperators;
 
   /// counter to generate unique trace lines for debug
   int trace_counter = -1;

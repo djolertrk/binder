@@ -43,7 +43,7 @@ void add_relevant_include_for_decl(clang::NamedDecl const *decl,
 
 /// extract include needed for this generator and add it to includes vector
 void add_relevant_includes(
-    clang::QualType const &qt,
+    Context &context, clang::QualType const &qt,
     /*clang::ASTContext const &context,*/ IncludeSet &includes, int level);
 
 /// check if given QualType is bindable

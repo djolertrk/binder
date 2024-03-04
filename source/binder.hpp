@@ -53,7 +53,8 @@ private:
 
   StackType stack_;
 
-  friend void add_relevant_includes_cached(clang::CXXRecordDecl const *C,
+  friend void add_relevant_includes_cached(Context &context,
+                                           clang::CXXRecordDecl const *C,
                                            IncludeSet &includes);
 };
 
@@ -74,7 +75,7 @@ public:
   virtual clang::NamedDecl const *named_decl() const = 0;
 
   /// check if generator can create binding
-  virtual bool bindable() const = 0;
+  virtual bool bindable(Context &) const = 0;
 
   bool binding_requested() const { return binding_requested_; };
   bool skipping_requested() const { return skipping_requested_; };
@@ -90,7 +91,7 @@ public:
   virtual void request_bindings_and_skipping(Config const &) = 0;
 
   /// extract include needed for this generator and add it to includes vector
-  virtual void add_relevant_includes(IncludeSet &) const = 0;
+  virtual void add_relevant_includes(Context &, IncludeSet &) const = 0;
 
   /// generate binding code for this object and all its dependencies
   virtual void bind(Context &) = 0;

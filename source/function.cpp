@@ -188,9 +188,9 @@ string template_specialization(FunctionDecl const *F) {
     // if( FunctionDecl const *master = F->getTemplateInstantiationPattern() ) {
     // 	outs() << "master for: " << F->getNameAsString() << "\n";
     // 	if( TemplateArgumentList const *ta = F->getTemplateSpecializationArgs()
-    // ) { 		for(uint i=0; i < ta->size(); ++i) { 			string arg =
-    // template_argument_to_string( ta->get(i) ); 			outs() << arg << " kind: " <<
-    // ta->get(i).getKind()  << "\n";
+    // ) { 		for(uint i=0; i < ta->size(); ++i) { 			string arg
+    // = template_argument_to_string( ta->get(i) ); 			outs()
+    // << arg << " kind: " << ta->get(i).getKind()  << "\n";
     // 		}
     // 	}
     // }
@@ -407,7 +407,8 @@ bool is_skipping_requested(FunctionDecl const *F, Config const &config) {
 // (aaaa::A::*)(int) ) &aaaa::A::foo, "doc")
 string bind_function(FunctionDecl const *F, uint args_to_bind,
                      bool request_bindings_f, Context &context,
-                     CXXRecordDecl const *parent, bool always_use_lambda) {
+                     CXXRecordDecl const *parent, bool always_use_lambda,
+                     bool skip_implicit_this) {
   string function_name = python_function_name(F);
 
   string function_qualified_name = standard_name(
@@ -519,6 +520,12 @@ string bind_function(FunctionDecl const *F, uint args_to_bind,
     request_bindings(F->getReturnType().getCanonicalType(), context);
 
   for (uint i = 0; i < F->getNumParams() and i < args_to_bind; ++i) {
+    // As we are moving global operators into the class scope, skip first arg
+    // since it will be implicitly `this` in the Python object.
+    if (skip_implicit_this and i == 0) {
+      continue;
+    }
+
     r +=
         ", pybind11::arg(\"{}\")"_format(string(F->getParamDecl(i)->getName()));
 
@@ -540,7 +547,7 @@ string bind_function(FunctionDecl const *F, uint args_to_bind,
 // that CXXRecordDecl (for handling visibility changes with 'using' directive)
 string bind_function(string const &module, FunctionDecl const *F,
                      Context &context, CXXRecordDecl const *parent,
-                     bool always_use_lambda) {
+                     bool always_use_lambda, bool skip_implicit_this) {
   string code;
 
   int num_params = F->getNumParams();
@@ -565,14 +572,16 @@ string bind_function(string const &module, FunctionDecl const *F,
   for (; args_to_bind <= num_params; ++args_to_bind)
     code += module +
             bind_function(F, args_to_bind, args_to_bind == num_params, context,
-                          parent, always_use_lambda or F->isVariadic()) +
+                          parent, always_use_lambda or F->isVariadic(),
+                          skip_implicit_this) +
             '\n';
 
   return code;
 }
 
 /// extract include needed for this generator and add it to includes vector
-void add_relevant_includes(FunctionDecl const *F, IncludeSet &includes,
+void add_relevant_includes(Context &context, FunctionDecl const *F,
+                           IncludeSet &includes,
                            int level /*, bool for_template_arg_only*/) {
   if (!includes.add_decl(F, level))
     return;
@@ -580,7 +589,7 @@ void add_relevant_includes(FunctionDecl const *F, IncludeSet &includes,
   add_relevant_include_for_decl(F, includes);
 
   for (auto &t : get_type_dependencies(F))
-    binder::add_relevant_includes(t, includes, level);
+    binder::add_relevant_includes(context, t, includes, level);
 }
 
 /// Generate string id that uniquly identify C++ binding object. For functions
@@ -588,7 +597,7 @@ void add_relevant_includes(FunctionDecl const *F, IncludeSet &includes,
 string FunctionBinder::id() const { return function_qualified_name(F); }
 
 /// check if generator can create binding
-bool is_bindable_raw(FunctionDecl const *F) {
+bool is_bindable_raw(FunctionDecl const *F, Context &context) {
   // outs() << "is_bindable: " << F->getQualifiedNameAsString() << "\n";
   // if( F->getQualifiedNameAsString() == "utility::foo" ) {
   // 	//outs() << "FunctionDecl::TK_FunctionTemplate: " <<
@@ -634,22 +643,35 @@ bool is_bindable_raw(FunctionDecl const *F) {
 
   for (auto p = F->param_begin(); p != F->param_end(); ++p)
     r &= is_bindable((*p)->getOriginalType().getCanonicalType());
-  // outs() << "is_bindable: " << F->getQualifiedNameAsString() << " " << r <<
-  // "\n";
 
   if (r && is_banned_symbol(F))
     return false;
+
+  if (r && F->isOverloadedOperator()) {
+    auto p = F->param_begin();
+    auto qtt = (*p)->getOriginalType().getCanonicalType();
+    if (qtt->isLValueReferenceType()) {
+      qtt = qtt->getPointeeType();
+    }
+
+    if (auto RecType = qtt->getAs<RecordType>()) {
+      if (auto CXXDecl = dyn_cast<CXXRecordDecl>(RecType->getDecl())) {
+        context.add_global_operator_to_class_scope(CXXDecl, F);
+      }
+    }
+  }
+
   return r;
 }
 
 /// check if generator can create binding
-bool is_bindable(FunctionDecl const *F) {
+bool is_bindable(FunctionDecl const *F, Context &context) {
   static llvm::DenseMap<FunctionDecl const *, bool> cache;
   auto it = cache.find(F);
   if (it != cache.end())
     return it->second;
   else {
-    bool r = is_bindable_raw(F);
+    bool r = is_bindable_raw(F, context);
     cache.insert({F, r});
     return r;
   }
@@ -695,7 +717,9 @@ bool is_overloadable(CXXMethodDecl const *M) {
   */
 }
 
-bool FunctionBinder::bindable() const { return binder::is_bindable(F); }
+bool FunctionBinder::bindable(Context &context) const {
+  return binder::is_bindable(F, context);
+}
 
 /// check if user requested binding for the given declaration
 void FunctionBinder::request_bindings_and_skipping(Config const &config) {
@@ -706,8 +730,9 @@ void FunctionBinder::request_bindings_and_skipping(Config const &config) {
 }
 
 /// extract include needed for this generator and add it to includes vector
-void FunctionBinder::add_relevant_includes(IncludeSet &includes) const {
-  binder::add_relevant_includes(F, includes, 0);
+void FunctionBinder::add_relevant_includes(Context &context,
+                                           IncludeSet &includes) const {
+  binder::add_relevant_includes(context, F, includes, 0);
 }
 
 /// generate binding code for this object and all its dependencies

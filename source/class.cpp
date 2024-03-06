@@ -837,6 +837,9 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
                                                         *> &prefix_includes_ /*, std::set<clang::NamedDecl const *> &prefix_includes_stack*/) {
   string c;
 
+  if(is_skipping_requested(C, Config::get()))
+    return c;
+
   for (auto m = C->method_begin(); m != C->method_end(); ++m) {
     if ((m->getAccess() != AS_private) and is_bindable(*m) and
         is_overloadable(*m)                           //
@@ -986,6 +989,9 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
 // Genarate code for defining 'call-back struct' that act as 'trampoline' and
 // allows overlading virtual functions in Python
 void ClassBinder::generate_prefix_code() {
+  if (is_skipping_requested(C, Config::get()))
+    return;
+
   if (!is_callback_structure_needed(C))
     return;
 
@@ -1522,6 +1528,9 @@ string ClassBinder::bind_nested_classes(Context &context) {
 /// generate binding code for this object and all its dependencies
 void ClassBinder::bind(Context &context) {
   if (is_binded())
+    return;
+
+  if (is_skipping_requested(C, Config::get()))
     return;
 
   string const qualified_name = class_qualified_name(C);

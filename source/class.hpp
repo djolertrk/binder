@@ -57,8 +57,8 @@ bool is_binding_requested(clang::CXXRecordDecl const *C, Config const &config);
 bool is_skipping_requested(clang::CXXRecordDecl const *C, Config const &config);
 
 // extract include needed for declaration and add it to includes
-void add_relevant_includes(clang::CXXRecordDecl const *C, IncludeSet &includes,
-                           int level);
+void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
+                           IncludeSet &includes, int level);
 
 /// Create forward-binding for forward declared class (no class members given)
 std::string bind_forward_declaration(clang::CXXRecordDecl const *C, Context &);
@@ -78,13 +78,14 @@ public:
   clang::NamedDecl const *named_decl() const override { return C; };
 
   /// check if generator can create binding
-  bool bindable() const override;
+  bool bindable(Context &) const override;
 
   /// check if user requested binding for the given declaration
   virtual void request_bindings_and_skipping(Config const &) override;
 
   /// extract include needed for this generator and add it to includes vector
-  void add_relevant_includes(IncludeSet &includes) const override;
+  void add_relevant_includes(Context &context,
+                             IncludeSet &includes) const override;
 
   /// generate binding code for this object by using external user-provided
   /// binder
@@ -114,7 +115,7 @@ private:
   /// describing them: , pybind11::base<BaseClass>()
   std::string maybe_base_classes(Context &context);
 
-  void generate_prefix_code();
+  void generate_prefix_code(Context &context);
 
   // do for each nested public class
   void for_public_nested_classes(

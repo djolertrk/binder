@@ -391,11 +391,44 @@ bool Config::is_namespace_binding_requested(string const &namespace_) const {
 }
 
 bool Config::is_namespace_skipping_requested(string const &namespace_) const {
-  for (auto &s : namespaces_to_skip) {
-    if (s.find(namespace_) != std::string::npos) {
-      return true;
+  bool to_bind_flag = false, to_skip_flag = false;
+  string to_bind, to_skip;
+
+  for (auto &n : namespaces_to_bind) {
+    if (begins_with(namespace_, n)) {
+      if (n.size() > to_bind.size()) {
+        to_bind = n;
+        to_bind_flag = true;
+      }
     }
   }
+
+  for (auto &s : namespaces_to_skip) {
+    if (begins_with(namespace_, s)) {
+      if (s.size() > to_skip.size()) {
+        to_skip = s;
+        to_skip_flag = true;
+      }
+    }
+  }
+
+  if (to_bind.size() > to_skip.size())
+    return false;
+  if (to_bind.size() < to_skip.size())
+    return true;
+
+  if (to_bind_flag and to_skip_flag) {
+    outs() << "Could not determent if namespace '" << namespace_
+           << "' should be binded or not... please check if options --bind and "
+              "--skip conflicting!!!\n";
+    assert(false);
+  }
+  // throw std::runtime_error("Could not determent if namespace '" + namespace_
+  // + "' should be binded or not... please check if options --bind and --skip
+  // conflicting!!!");
+
+  if (to_skip_flag)
+    return true;
 
   return false;
 }

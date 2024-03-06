@@ -649,14 +649,16 @@ bool is_bindable_raw(FunctionDecl const *F, Context &context) {
 
   if (r && F->isOverloadedOperator()) {
     auto p = F->param_begin();
-    auto qtt = (*p)->getOriginalType().getCanonicalType();
-    if (qtt->isLValueReferenceType()) {
-      qtt = qtt->getPointeeType();
-    }
+    if (p != F->param_end()) {
+      auto qtt = (*p)->getOriginalType().getCanonicalType();
+      if (qtt->isLValueReferenceType()) {
+        qtt = qtt->getPointeeType();
+      }
 
-    if (auto RecType = qtt->getAs<RecordType>()) {
-      if (auto CXXDecl = dyn_cast<CXXRecordDecl>(RecType->getDecl())) {
-        context.add_global_operator_to_class_scope(CXXDecl, F);
+      if (auto RecType = qtt->getAs<RecordType>()) {
+        if (auto CXXDecl = dyn_cast<CXXRecordDecl>(RecType->getDecl())) {
+          context.add_global_operator_to_class_scope(CXXDecl, F);
+        }
       }
     }
   }

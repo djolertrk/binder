@@ -392,7 +392,7 @@ bool Config::is_namespace_binding_requested(string const &namespace_) const {
 
 bool Config::is_namespace_skipping_requested(string const &namespace_) const {
   for (auto &s : namespaces_to_skip) {
-    if (begins_with(s, namespace_)) {
+    if (s.find(std::string(namespace_ + "::")) != std::string::npos) {
       return true;
     }
   }

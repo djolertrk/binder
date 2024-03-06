@@ -346,19 +346,15 @@ bool is_bindable_raw(clang::CXXRecordDecl const *C) {
   // if( auto t = dyn_cast<ClassTemplateSpecializationDecl>(C) ) {
   // 	for(uint i=0; i < t->getTemplateArgs().size(); ++i) {
 
-  // 		if( t->getTemplateArgs()[i].getKind() == TemplateArgument::Type
-  // )
-  // { 			if( !is_bindable( t->getTemplateArgs()[i].getAsType() )
-  // ) return false;
+  // 		if( t->getTemplateArgs()[i].getKind() == TemplateArgument::Type )
+  // { 			if( !is_bindable( t->getTemplateArgs()[i].getAsType() ) ) return false;
   // 		}
 
   // 		if( t->getTemplateArgs()[i].getKind() ==
-  // TemplateArgument::Declaration )  { 			if( ValueDecl *v
-  // =
-  // t->getTemplateArgs()[i].getAsDecl() ) { 				if(
-  // v->getAccess()
-  // == AS_protected or  v->getAccess() == AS_private ) { outs() << "Private
-  // template VALUE arg: " << v->getNameAsString() << "\n"; return false;
+  // TemplateArgument::Declaration )  { 			if( ValueDecl *v =
+  // t->getTemplateArgs()[i].getAsDecl() ) { 				if( v->getAccess() == AS_protected
+  // or  v->getAccess() == AS_private ) { 					outs() << "Private template VALUE arg:
+  // " << v->getNameAsString() << "\n"; 					return false;
   // 				}
   // 			}
   // 		}
@@ -369,12 +365,10 @@ bool is_bindable_raw(clang::CXXRecordDecl const *C) {
   // Actually just always bind _all_ abstarct classes (but do not create
   // trampoline for them if they can not be derived-from in Python!) so we can
   // access base interfaces from Python if( C->hasDefinition()  and
-  // C->isAbstract() ) { 	for(auto m = C->method_begin(); m !=
-  // C->method_end();
-  // ++m) { 		if( m->isPure() and is_const_overload(*m) ) return
-  // false;
-  // // it is not clear how to deal with this case since we can't overrdie const
-  // versions in Python, - so disabling for now
+  // C->isAbstract() ) { 	for(auto m = C->method_begin(); m != C->method_end();
+  // ++m) { 		if( m->isPure() and is_const_overload(*m) ) return false;  // it is
+  // not clear how to deal with this case since we can't overrdie const versions
+  // in Python, - so disabling for now
   // 	}
   // }
 
@@ -433,8 +427,8 @@ bool is_skipping_requested(clang::CXXRecordDecl const *C,
 }
 
 // extract include needed for declaration and add it to includes
-void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
-                           IncludeSet &includes, int level) {
+void add_relevant_includes(clang::CXXRecordDecl const *C, IncludeSet &includes,
+                           int level) {
   if (!includes.add_decl(C, level))
     return;
 
@@ -445,7 +439,6 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
     for (uint i = 0; i < t->getTemplateArgs().size(); ++i) {
       if (t->getTemplateArgs()[i].getKind() == TemplateArgument::Type) {
         add_relevant_includes(
-            context,
             t->getTemplateArgs()[i].getAsType().getDesugaredType(
                 C->getASTContext()),
             includes, level + 1);
@@ -463,8 +456,7 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
         add_relevant_include_for_decl(v, includes);
       }
       if (t->getTemplateArgs()[i].getKind() == TemplateArgument::Integral) {
-        add_relevant_includes(context,
-                              t->getTemplateArgs()[i].getIntegralType(),
+        add_relevant_includes(t->getTemplateArgs()[i].getIntegralType(),
                               includes, level + 1);
       }
     }
@@ -477,8 +469,8 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
       for (auto s = ft->spec_begin(); s != ft->spec_end(); ++s) {
         if (CXXMethodDecl *m = dyn_cast<CXXMethodDecl>(*s)) {
           if (m->getAccess() == AS_public and
-              is_bindable(m, context) // and !is_skipping_requested(FunctionDecl
-                                      // const *F, Config const &config)
+              is_bindable(m) // and  !is_skipping_requested(FunctionDecl const
+                             // *F, Config const &config)
               and !is_skipping_requested(m, Config::get()) and
               !isa<CXXConstructorDecl>(m) and !isa<CXXDestructorDecl>(m)
               // and  !is_const_overload(m) // commenting out for now - because
@@ -486,7 +478,7 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
               // re-implemented in call-back struct's for pure-virtual methods
           ) {
             // m->dump();
-            add_relevant_includes(context, m, includes, level + 1);
+            add_relevant_includes(m, includes, level + 1);
           }
         }
       }
@@ -506,12 +498,10 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
       // if( FunctionDecl const *td = ft->getTemplatedDecl() ) {
       // 	td->dump();
       // 	if( TemplateArgumentList const *ta =
-      // td->getTemplateSpecializationArgs() ) { 		for(uint i=0; i
-      // < ta->size();
-      // ++i) { 			outs() << "function template argument: "
-      // << template_argument_to_string( ta->get(i) ) << "\n"; if(
-      // ta->get(i).isDependent() ) { 				outs() <<
-      // "isDependent!" << "\n";
+      // td->getTemplateSpecializationArgs() ) { 		for(uint i=0; i < ta->size();
+      // ++i) { 			outs() << "function template argument: " <<
+      // template_argument_to_string( ta->get(i) ) << "\n"; 			if(
+      // ta->get(i).isDependent() ) { 				outs() << "isDependent!" << "\n";
       // 			}
       // 			if( ta->get(i).isInstantiationDependent() ) {
       // 				outs() << "isInstantiationDependent!" <<
@@ -528,9 +518,9 @@ void add_relevant_includes(Context &context, clang::CXXRecordDecl const *C,
   if (level < 2) {
     for (auto m = C->method_begin(); m != C->method_end(); ++m) {
       if (m->getAccess() == AS_public and
-          is_bindable(*m, context) /*and  !isa<CXXConstructorDecl>(*m)*/ and
+          is_bindable(*m) /*and  !isa<CXXConstructorDecl>(*m)*/ and
           !isa<CXXDestructorDecl>(*m)) {
-        add_relevant_includes(context, *m, includes, level + 1);
+        add_relevant_includes(*m, includes, level + 1);
       }
     }
   }
@@ -542,8 +532,7 @@ inline void add_includes_to_set(std::vector<std::string> const &from,
     to.add_include(i);
 }
 
-void add_relevant_includes_cached(Context &context,
-                                  clang::CXXRecordDecl const *C,
+void add_relevant_includes_cached(clang::CXXRecordDecl const *C,
                                   IncludeSet &includes) {
   static std::unordered_map<clang::CXXRecordDecl const *,
                             std::vector<std::string>>
@@ -555,7 +544,7 @@ void add_relevant_includes_cached(Context &context,
     add_includes_to_set(it->second, includes);
   else {
     IncludeSet is;
-    add_relevant_includes(context, C, is, 1);
+    add_relevant_includes(C, is, 1);
     add_includes_to_set(is.includes(), includes);
     cache.emplace(C, is.includes_);
   }
@@ -567,19 +556,16 @@ void add_relevant_includes_cached(Context &context,
 // 	for(auto b = C->bases_begin(); b!=C->bases_end(); ++b) {
 // 		if( auto rt =
 // dyn_cast<RecordType>(b->getType().getCanonicalType().getTypePtr() ) ) {
-// 			if(CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())
-// ) { 				if( !R->hasDefaultConstructor() ) return false;
-// bool default_constructor_processed = false;
-// for(auto t = R->ctor_begin(); t !=
-// R->ctor_end(); ++t) { 					if(
-// t->isDefaultConstructor()
-// ) { 						if( t->getAccess() == AS_private
-// or   !t->isUserProvided()  or  t->isDeleted() ) return false;
+// 			if(CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl()) )
+// { 				if( !R->hasDefaultConstructor() ) return false; 				bool
+// default_constructor_processed = false; 				for(auto t = R->ctor_begin(); t !=
+// R->ctor_end(); ++t) { 					if( t->isDefaultConstructor() ) { 						if( t->getAccess() ==
+// AS_private  or   !t->isUserProvided()  or  t->isDeleted() ) return false;
 // 					}
 // 					default_constructor_processed = true;
 // 				}
 // 				if( R->ctor_begin() != R->ctor_end()   and
-// !default_constructor_processed ) return false; if(
+// !default_constructor_processed ) return false; 				if(
 // !is_default_default_constructor_available(R) ) return false;
 // 			}
 // 		}
@@ -619,7 +605,7 @@ bool base_default_default_constructor_available(CXXRecordDecl const *C) {
 string ClassBinder::id() const { return class_qualified_name(C); }
 
 /// check if generator can create binding
-bool ClassBinder::bindable(Context &) const {
+bool ClassBinder::bindable() const {
   return is_bindable(C) and !skipping_requested();
 }
 
@@ -632,8 +618,7 @@ void ClassBinder::request_bindings_and_skipping(Config const &config) {
 }
 
 /// extract include needed for this generator and add it to includes vector
-void ClassBinder::add_relevant_includes(Context &context,
-                                        IncludeSet &includes) const {
+void ClassBinder::add_relevant_includes(IncludeSet &includes) const {
   string const qualified_name_without_template =
       standard_name(C->getQualifiedNameAsString());
   std::map<string, std::vector<string>> const &class_includes =
@@ -646,13 +631,13 @@ void ClassBinder::add_relevant_includes(Context &context,
                                                : i);
   }
 
-  for_public_nested_classes([&includes, &context](CXXRecordDecl const *innerC) {
-    ClassBinder(innerC).add_relevant_includes(context, includes);
+  for_public_nested_classes([&includes](CXXRecordDecl const *innerC) {
+    ClassBinder(innerC).add_relevant_includes(includes);
   });
 
   for (auto &m : prefix_includes_)
-    binder::add_relevant_includes(context, m, includes, 0);
-  binder::add_relevant_includes(context, C, includes, 0);
+    binder::add_relevant_includes(m, includes, 0);
+  binder::add_relevant_includes(C, includes, 0);
 
   includes.add_include("<sstream> // __str__");
 }
@@ -729,7 +714,7 @@ inline string callback_structure_name(CXXRecordDecl const *C) {
 
 // Check if binding this class require creation of call-back structure to allow
 // overriding virtual functions in Python
-bool is_callback_structure_needed(CXXRecordDecl const *C, Context &context) {
+bool is_callback_structure_needed(CXXRecordDecl const *C) {
   // C->dump();
 
   // Instantiation delayed.
@@ -750,8 +735,8 @@ bool is_callback_structure_needed(CXXRecordDecl const *C, Context &context) {
     return false;
 
   for (auto m = C->method_begin(); m != C->method_end(); ++m) {
-    if (m->getAccess() != AS_private and is_bindable(*m, context) and
-        m->isVirtual() and !isa<CXXDestructorDecl>(*m))
+    if (m->getAccess() != AS_private and is_bindable(*m) and m->isVirtual() and
+        !isa<CXXDestructorDecl>(*m))
       return true;
   }
 
@@ -760,7 +745,7 @@ bool is_callback_structure_needed(CXXRecordDecl const *C, Context &context) {
       if (auto rt = dyn_cast<RecordType>(
               b->getType().getCanonicalType().getTypePtr())) {
         if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
-          if (is_callback_structure_needed(R, context))
+          if (is_callback_structure_needed(R))
             return true;
         }
       }
@@ -771,8 +756,7 @@ bool is_callback_structure_needed(CXXRecordDecl const *C, Context &context) {
 }
 
 // Check if call-back structure that we can create will be constructible
-bool is_callback_structure_constructible(CXXRecordDecl const *C,
-                                         Context &context) {
+bool is_callback_structure_constructible(CXXRecordDecl const *C) {
   // Instantiation delayed.
   if (!C->getDefinition())
     return false;
@@ -780,7 +764,7 @@ bool is_callback_structure_constructible(CXXRecordDecl const *C,
   if (C->isAbstract()) {
     for (auto m = C->method_begin(); m != C->method_end(); ++m) {
       if (m->isPure() and !isa<CXXConstructorDecl>(*m) and
-          (m->getAccess() == AS_private or !is_bindable(*m, context) or
+          (m->getAccess() == AS_private or !is_bindable(*m) or
            is_skipping_requested(*m, Config::get())))
         return false;
     }
@@ -790,7 +774,7 @@ bool is_callback_structure_constructible(CXXRecordDecl const *C,
               b->getType().getCanonicalType().getTypePtr())) {
         if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
           if (b->getAccessSpecifier() != AS_private) {
-            if (!is_callback_structure_constructible(R, context))
+            if (!is_callback_structure_constructible(R))
               return false;
           } else if (R->isAbstract())
             return false;
@@ -818,11 +802,9 @@ bool is_callback_structure_constructible(CXXRecordDecl const *C,
 // 			auto o = overload(__VA_ARGS__); \
 // 			if
 // (pybind11::detail::cast_is_temporary_value_reference<ret_type>::value) { \
-// 				static
-// pybind11::detail::overload_caster_t<ret_type>
+// 				static pybind11::detail::overload_caster_t<ret_type>
 // caster; \
-// 				return
-// pybind11::detail::cast_ref<ret_type>(std::move(o),
+// 				return pybind11::detail::cast_ref<ret_type>(std::move(o),
 // caster); \
 // 			} \
 // 			else return
@@ -846,7 +828,7 @@ if (overload) {{
 // generate call-back overloads for all public virtual functions in C including
 // it bases
 string
-bind_member_functions_for_call_back(Context &context, CXXRecordDecl const *C,
+bind_member_functions_for_call_back(CXXRecordDecl const *C,
                                     string const &class_name,
                                     /*string const & base_type_alias,*/
                                     set<string> &binded, int &ret_id,
@@ -856,7 +838,7 @@ bind_member_functions_for_call_back(Context &context, CXXRecordDecl const *C,
   string c;
 
   for (auto m = C->method_begin(); m != C->method_end(); ++m) {
-    if ((m->getAccess() != AS_private) and is_bindable(*m, context) and
+    if ((m->getAccess() != AS_private) and is_bindable(*m) and
         is_overloadable(*m)                           //
         and !is_skipping_requested(*m, Config::get()) //
         and !isa<CXXConstructorDecl>(*m) and !isa<CXXDestructorDecl>(*m) and
@@ -875,14 +857,12 @@ bind_member_functions_for_call_back(Context &context, CXXRecordDecl const *C,
       fix_boolean_types(return_type);
 
       // check if we need to fix return class to be 'derived-class &' or
-      // 'derived-class *' if( m->isVirtual() ) { 	if(
-      // begins_with(return_type, "class ") ) return_type =
-      // return_type.substr(6/*len("class ")*/); 	else if(
-      // begins_with(return_type, "struct ") ) return_type =
+      // 'derived-class *' if( m->isVirtual() ) { 	if( begins_with(return_type,
+      // "class ") ) return_type = return_type.substr(6/*len("class ")*/); 	else
+      // if( begins_with(return_type, "struct ") ) return_type =
       // return_type.substr(7/*len("struct ")*/); 	if( return_type ==
-      // class_qualified_name(C) + " &") return_type = class_name + " &";
-      // if( return_type == class_qualified_name(C) + " *") return_type =
-      // class_name
+      // class_qualified_name(C) + " &") return_type = class_name + " &"; 	if(
+      // return_type == class_qualified_name(C) + " *") return_type = class_name
       // + " *";
       // }
 
@@ -992,7 +972,7 @@ bind_member_functions_for_call_back(Context &context, CXXRecordDecl const *C,
         if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
           // add_relevant_includes(R, prefix_includes, prefix_includes_stack,
           // 0);
-          c += bind_member_functions_for_call_back(context, R, class_name,
+          c += bind_member_functions_for_call_back(R, class_name,
                                                    /*base_type_alias,*/ binded,
                                                    ret_id, prefix_includes_);
         }
@@ -1005,8 +985,8 @@ bind_member_functions_for_call_back(Context &context, CXXRecordDecl const *C,
 
 // Genarate code for defining 'call-back struct' that act as 'trampoline' and
 // allows overlading virtual functions in Python
-void ClassBinder::generate_prefix_code(Context &context) {
-  if (!is_callback_structure_needed(C, context))
+void ClassBinder::generate_prefix_code() {
+  if (!is_callback_structure_needed(C))
     return;
 
   prefix_code_ = generate_comment_for_declaration(C);
@@ -1021,32 +1001,9 @@ void ClassBinder::generate_prefix_code(Context &context) {
   set<string> binded;
   int ret_id = 0;
   prefix_code_ += bind_member_functions_for_call_back(
-      context, C, class_qualified_name(C), /*base_type_alias,*/ binded, ret_id,
+      C, class_qualified_name(C), /*base_type_alias,*/ binded, ret_id,
       prefix_includes_);
   prefix_code_ += "};\n\n";
-}
-
-string binding_global_operators_as_member_functions(
-    CXXRecordDecl const *C, bool callback_structure,
-    bool callback_structure_constructible, Context &context,
-    std::vector<clang::FunctionDecl const *> &operators) {
-  string c;
-
-  // TODO: think about using operations such as __req__ if the type on the left
-  // is not binded.
-
-  for (auto &op : operators) {
-    if (is_bindable(op, context)) {
-      auto &config = Config::get();
-      if (config.verbose) {
-        outs() << "Binding: global operator " << function_qualified_name(op)
-               << " into class scope: " << class_qualified_name(C) << '\n';
-      }
-      c += bind_function("\tcl", &*op, context, nullptr, false, true);
-    }
-  }
-
-  return c;
 }
 
 string binding_public_member_functions(CXXRecordDecl const *C,
@@ -1056,10 +1013,6 @@ string binding_public_member_functions(CXXRecordDecl const *C,
   string c;
   // binding protected/private member functions that was made public in
   // child class by 'using' declaration
-
-  // outs() << "Here we are!\n";
-  // C->dump();
-
   for (auto d = C->decls_begin(); d != C->decls_end(); ++d) {
     if (UsingDecl *u = dyn_cast<UsingDecl>(*d)) {
       if (u->getAccess() == AS_public) {
@@ -1067,10 +1020,52 @@ string binding_public_member_functions(CXXRecordDecl const *C,
           if (UsingShadowDecl *us = dyn_cast<UsingShadowDecl>(*s)) {
             if (CXXMethodDecl *m =
                     dyn_cast<CXXMethodDecl>(us->getTargetDecl())) {
-              if (is_bindable(m, context) and
+              if (is_bindable(m) and
                   !is_skipping_requested(m, Config::get()) and
                   !isa<CXXConstructorDecl>(m) and !isa<CXXDestructorDecl>(m) and
                   !is_const_overload(m)) {
+                // Create a new
+                // CXXRecordDecl
+                // and insert
+                // base method
+                // into
+                // inherited
+                // class so
+                // bind_function
+                // correctly
+                // resolve
+                // parent
+                // namespace for
+                // function as
+                // 'child::'
+                // instead of
+                // 'base::'
+                // CXXRecordDecl
+                // NC(*C);
+                // CXXMethodDecl
+                // *nm =
+                // CXXMethodDecl::Create(m->getParentASTContext(),
+                // &NC,
+                // m->getLocStart(),
+                // m->getNameInfo(),
+                // m->getType(),
+                // m->getTypeSourceInfo(),
+                // m->getStorageClass(),
+                // m->isInlineSpecified(),
+                // m->isConstexpr()
+                // ,
+                // m->getLocStart());
+                // it looks like
+                // LLVM will
+                // delete this
+                // object when
+                // parent
+                // CXXRecordDecl
+                // is destroyed
+                // so commenting
+                // out for
+                // now... //
+                // delete nm;
                 c += bind_function("\tcl", m, context, C,
                                    /*always_use_lambda=*/
                                    true);
@@ -1085,7 +1080,7 @@ string binding_public_member_functions(CXXRecordDecl const *C,
       for (auto s = ft->spec_begin(); s != ft->spec_end(); ++s) {
         if (CXXMethodDecl *m = dyn_cast<CXXMethodDecl>(*s)) {
           if (m->getAccess() == AS_public //
-              and is_bindable(m, context) // and
+              and is_bindable(m)          // and
                                           // !is_skipping_requested(FunctionDecl
                                           // const *F, Config
                                           // const &config)
@@ -1099,34 +1094,17 @@ string binding_public_member_functions(CXXRecordDecl const *C,
         }
       }
     }
-
-    // if (CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(*d)) {
-    // 	outs() << "tuuuuuuuuuuu\n";
-    // 	method->dump();
-    // 	c += bind_function("\tcl", *m, context);
-    // }
   }
 
   for (auto m = C->method_begin(); m != C->method_end(); ++m) {
-    // bool ma = m->getAccess() == AS_public;
-    // outs() << "tuuuuuuuuuuu " << ma << " " << is_bindable(*m) << " " <<
-    // is_skipping_requested(*m, Config::get())
-    //        << " " << isa<CXXConstructorDecl>(*m) << " " <<
-    //        isa<CXXDestructorDecl>(*m) << " " << is_const_overload(*m) <<
-    //        '\n';
-    // m->dump();
-
-    if (m->getAccess() == AS_public  //
-        and is_bindable(*m, context) // and  !is_skipping_requested(FunctionDecl
-                                     // const *F, Config const &config)
+    if (m->getAccess() == AS_public //
+        and is_bindable(*m)         // and  !is_skipping_requested(FunctionDecl
+                                    // const *F, Config const &config)
         and !is_skipping_requested(*m, Config::get())                    //
         and !isa<CXXConstructorDecl>(*m) and !isa<CXXDestructorDecl>(*m) //
         and !is_const_overload(*m)) {                                    //
-      auto &config = Config::get();
-      if (config.verbose) {
-        outs() << "Binding: " << class_qualified_name(C)
-               << "::" << m->getNameAsString() << "\n";
-      }
+      //(*m)->dump();
+
       c += bind_function("\tcl", *m, context);
     }
   }
@@ -1406,9 +1384,9 @@ string bind_copy_constructor(
   // CBI.callback_structure_constructible  and  not CBI.C->isAbstract() ) return
   // "\tcl.def( pybind11::init( []({0} const &o){{ return new {0}(o); }}, []({1}
   // const &o){{ return new {1}(o); }} )
-  // );\n"_format(CBI.class_qualified_name, CBI.binding_qualified_name);
-  // else return "\tcl.def( pybind11::init( []({0} const &o){{ return new
-  // {0}(o); }} ) );\n"_format(CBI.class_qualified_name );
+  // );\n"_format(CBI.class_qualified_name, CBI.binding_qualified_name); 	else
+  // return "\tcl.def( pybind11::init( []({0} const &o){{ return new {0}(o); }}
+  // ) );\n"_format(CBI.class_qualified_name );
   // }
   // else {
   // 	if( CBI.C->isAbstract() ) return "\tcl.def(pybind11::init<{} const
@@ -1559,15 +1537,15 @@ void ClassBinder::bind(Context &context) {
     return;
   }
 
-  assert(bindable(context) && "Attempt to bind non-bindable CXXRecord!");
+  assert(bindable() && "Attempt to bind non-bindable CXXRecord!");
 
-  bool callback_structure = is_callback_structure_needed(C, context);
+  bool callback_structure = is_callback_structure_needed(C);
   bool callback_structure_constructible =
-      callback_structure and is_callback_structure_constructible(C, context);
+      callback_structure and is_callback_structure_constructible(C);
   bool trampoline = callback_structure and callback_structure_constructible;
 
   if (trampoline)
-    generate_prefix_code(context);
+    generate_prefix_code();
 
   bool named_class = not C->isAnonymousStructOrUnion();
 
@@ -1660,7 +1638,7 @@ void ClassBinder::bind(Context &context) {
       if (ctor->isDeleted())
         continue;
       if (t->getAccess() == AS_public and !t->isMoveConstructor() and
-          is_bindable(*t, context) and
+          is_bindable(*t) and
           !is_skipping_requested(
               *t, Config::get()) /*and  t->doesThisDeclarationHaveABody()*/) {
         ConstructorBindingInfo CBI = {
@@ -1691,7 +1669,7 @@ void ClassBinder::bind(Context &context) {
             if (UsingShadowDecl *us = dyn_cast<UsingShadowDecl>(*s)) {
               if (CXXConstructorDecl *t =
                       dyn_cast<CXXConstructorDecl>(us->getTargetDecl())) {
-                if (is_bindable(t, context)) {
+                if (is_bindable(t)) {
                   ConstructorBindingInfo CBI = {
                       C,      t, trampoline, qualified_name, trampoline_name,
                       context};
@@ -1764,15 +1742,8 @@ void ClassBinder::bind(Context &context) {
   }
 
   c += binding_public_data_members(C);
-
   c += binding_public_member_functions(
       C, callback_structure, callback_structure_constructible, context);
-
-  if (auto operators = context.get_global_operators(C)) {
-    c += binding_global_operators_as_member_functions(
-        C, callback_structure, callback_structure_constructible, context,
-        *operators);
-  }
 
   c += binding_template_bases(C, callback_structure,
                               callback_structure_constructible, context);

@@ -64,16 +64,14 @@ bool is_skipping_requested(clang::FunctionDecl const *F, Config const &config);
 std::string bind_function(std::string const &module,
                           clang::FunctionDecl const *F, Context &,
                           clang::CXXRecordDecl const *parent = nullptr,
-                          bool always_use_lambda = false,
-                          bool skip_implicit_this = false);
+                          bool always_use_lambda = false);
 
 /// extract include needed for this generator and add it to includes vector
-void add_relevant_includes(Context &context, clang::FunctionDecl const *F,
-                           IncludeSet &includes,
+void add_relevant_includes(clang::FunctionDecl const *F, IncludeSet &includes,
                            int level /*, bool for_template_arg_only=false*/);
 
 /// check if generator can create binding
-bool is_bindable(clang::FunctionDecl const *F, Context &context);
+bool is_bindable(clang::FunctionDecl const *F);
 
 /// check if methods could be overload in Python
 bool is_overloadable(clang::CXXMethodDecl const *M);
@@ -91,14 +89,13 @@ public:
   clang::NamedDecl const *named_decl() const override { return F; };
 
   /// check if generator can create binding
-  bool bindable(Context &) const override;
+  bool bindable() const override;
 
   /// check if user requested binding for the given declaration
   void request_bindings_and_skipping(Config const &) override;
 
   /// extract include needed for this generator and add it to includes vector
-  void add_relevant_includes(Context &context,
-                             IncludeSet &includes) const override;
+  void add_relevant_includes(IncludeSet &includes) const override;
 
   /// generate binding code for this object and all its dependencies
   void bind(Context &) override;

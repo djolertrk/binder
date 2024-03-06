@@ -84,8 +84,6 @@ public:
     config.namespaces_to_bind = O_bind;
     config.namespaces_to_skip = O_skip;
 
-    config.verbose = O_verbose;
-
     if (O_config.size())
       config.read(O_config);
     if (O_suppress_errors) {
@@ -106,7 +104,7 @@ public:
     if (F->isCXXInstanceMember() or isa<CXXMethodDecl>(F))
       return true;
 
-    if (binder::is_bindable(F, context)) {
+    if (binder::is_bindable(F)) {
       binder::BinderOP b = std::make_shared<binder::FunctionBinder>(F);
       context.add(b);
     } else if (F->isOverloadedOperator() and
@@ -122,12 +120,11 @@ public:
   virtual bool VisitCXXRecordDecl(CXXRecordDecl *C) {
     //		C->dump();
     bool inner_class = C->isClass() && C->isCXXClassMember();
-    //		outs() << "Visit CXXRecordDecl: " <<
-    //C->getQualifiedNameAsString()
-    //<< "  isCXXClassMember: " << C->isCXXClassMember() << "
-    // isCXXInstanceMember: " << C->isCXXInstanceMember() << "  isClass: " <<
-    // C->isClass() << " isDependent: " << C->isDependentType() << "
-    // isInjectedClassName: " << C->isInjectedClassName()
+    //		outs() << "Visit CXXRecordDecl: " << C->getQualifiedNameAsString() <<
+    //"  isCXXClassMember: " << C->isCXXClassMember() << "  isCXXInstanceMember:
+    //" << C->isCXXInstanceMember() << "  isClass: " << C->isClass() << "
+    //isDependent: " << C->isDependentType() << "  isInjectedClassName: " <<
+    //C->isInjectedClassName()
     //		<< "inner_class : " << inner_class << "\n";
     if (!inner_class && (C->isCXXInstanceMember() or C->isCXXClassMember()))
       return true;
@@ -151,8 +148,7 @@ public:
 
   // virtual bool VisitTemplateDecl(TemplateDecl *record) {
   // 	//if( FullSourceLoc(record->getLocation(),
-  // ast_context->getSourceManager() ).isInSystemHeader() ) return true;
-  // errs()
+  // ast_context->getSourceManager() ).isInSystemHeader() ) return true; 	errs()
   // << "Visit TemplateDecl: " << record->getQualifiedNameAsString() << "\n";
   // 	//record->dump();
   //     return true;
@@ -160,8 +156,7 @@ public:
 
   // virtual bool VisitClassTemplateDecl(ClassTemplateDecl *record) {
   // 	//if( FullSourceLoc(record->getLocation(),
-  // ast_context->getSourceManager() ).isInSystemHeader() ) return true;
-  // errs()
+  // ast_context->getSourceManager() ).isInSystemHeader() ) return true; 	errs()
   // << "Visit ClassTemplateDecl: " << record->getQualifiedNameAsString() <<
   // binder::template_specialization( record->getTemplatedDecl() ) << "\n";
   // 	//record->dump();

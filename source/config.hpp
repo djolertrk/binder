@@ -132,8 +132,6 @@ public:
 
   bool skip_line_number = false;
 
-  bool verbose = false;
-
   /// check if user requested binding for given declaration
   bool is_namespace_binding_requested(string const &namespace_) const;
   bool is_namespace_skipping_requested(string const &namespace_) const;

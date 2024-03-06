@@ -28,8 +28,8 @@ using namespace fmt::literals;
 namespace binder {
 
 /// extract include needed for this generator and add it to includes vector
-void add_relevant_includes(Context &context, clang::EnumDecl const *E,
-                           IncludeSet &includes, int level) {
+void add_relevant_includes(clang::EnumDecl const *E, IncludeSet &includes,
+                           int level) {
   if (!includes.add_decl(E, level))
     return;
   add_relevant_include_for_decl(E, includes);
@@ -155,7 +155,7 @@ std::string bind_enum(std::string const &module, EnumDecl const *E) {
 string EnumBinder::id() const { return E->getQualifiedNameAsString(); }
 
 /// check if generator can create binding
-bool EnumBinder::bindable(Context &) const {
+bool EnumBinder::bindable() const {
   return is_bindable(E) and !is_banned_symbol(E);
 }
 
@@ -168,9 +168,8 @@ void EnumBinder::request_bindings_and_skipping(Config const &config) {
 }
 
 /// extract include needed for this generator and add it to includes vector
-void EnumBinder::add_relevant_includes(Context &context,
-                                       IncludeSet &includes) const {
-  binder::add_relevant_includes(context, E, includes, 0);
+void EnumBinder::add_relevant_includes(IncludeSet &includes) const {
+  binder::add_relevant_includes(E, includes, 0);
 }
 
 /// generate binding code for this object and all its dependencies

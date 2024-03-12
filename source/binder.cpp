@@ -8,6 +8,7 @@
 /// @brief  Classes IncludeSet and Binder
 /// @author Sergey Lyskov
 
+#include "clang/Basic/FileEntry.h"
 #include <binder.hpp>
 
 #include <type.hpp> // is_python_builtin
@@ -88,7 +89,16 @@ bool Binder::is_in_system_header() {
   ASTContext &ast_context(decl->getASTContext());
   SourceManager &sm(ast_context.getSourceManager());
 
-  return FullSourceLoc(decl->getLocation(), sm).isInSystemHeader();
+  auto source_loc (FullSourceLoc(decl->getLocation(), sm));
+
+  auto fname_ptr = source_loc.getSpellingLoc().getFileEntry();
+  if (fname_ptr) {
+    auto fname = fname_ptr->getName();
+
+    if (fname.contains("test-suite")) return true;
+  }
+
+  return source_loc.isInSystemHeader();
 }
 
 // return true if code was already generate for this object

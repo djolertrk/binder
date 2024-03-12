@@ -1006,6 +1006,8 @@ void ClassBinder::generate_prefix_code() {
   prefix_code_ += "};\n\n";
 }
 
+string cpp_python_operator(const FunctionDecl &F);
+
 string binding_public_member_functions(CXXRecordDecl const *C,
                                        bool callback_structure,
                                        bool callback_structure_constructible,
@@ -1013,6 +1015,57 @@ string binding_public_member_functions(CXXRecordDecl const *C,
   string c;
   // binding protected/private member functions that was made public in
   // child class by 'using' declaration
+
+  auto parent = C->getParent();
+    if (parent) {
+      for (auto d = parent->decls_begin(); d != parent->decls_end(); ++d) {
+        if (FunctionDecl *f = dyn_cast<FunctionDecl>(*d)) {
+          if (f->isOverloadedOperator()) {
+            if (f->getNumParams() == 2) {
+              // compare CXXRecordDecl with arguments of operator
+              auto qType1 = f->getParamDecl(0)->getType().getCanonicalType().getUnqualifiedType();
+              auto qType2 = f->getParamDecl(1)->getType().getCanonicalType().getUnqualifiedType();
+              if (qType1->isReferenceType()) {
+                qType1 = qType1->getPointeeType().getCanonicalType().getUnqualifiedType();
+              }
+              if (qType2->isReferenceType()) {
+                qType2 = qType2->getPointeeType().getCanonicalType().getUnqualifiedType();
+              }
+
+              llvm::outs() << f->getNameAsString() << " " << qType1.getAsString() << " "
+                            << f->getParamDecl(1)->getType().getCanonicalType().getUnqualifiedType().getAsString() << "\n";
+              llvm::outs() << C->getCanonicalDecl()->getTypeForDecl()->getCanonicalTypeInternal().getAsString() << "\n";
+
+              string operator_name = f->getNameAsString();
+
+              if (qType1.getTypePtr() == C->getCanonicalDecl()->getTypeForDecl()) {
+                  string cpp_operator_name = "";
+                  if (operator_name.rfind("operator", 0) == 0) {
+                    cpp_operator_name = operator_name.substr(8);
+                  }
+
+                  if (cpp_operator_name == "") continue;
+
+                  auto python_name = cpp_python_operator(*f);
+
+                  if (python_name.rfind("post_increment",0) == 0
+                    || python_name.rfind("post_decrement",0) == 0
+                  ) {
+                    continue;
+                  }
+
+
+                  if (python_name != "") {
+                      c += "\tcl.def(\"" + python_name + "\", [] (const " + qType1.getAsString() + " &a, " + qType2.getAsString() + " &b) { return a " + cpp_operator_name + " b; });// my operator fix \n";
+                  }
+              }
+            }
+          }
+        }
+      }
+    }
+
+
   for (auto d = C->decls_begin(); d != C->decls_end(); ++d) {
     if (UsingDecl *u = dyn_cast<UsingDecl>(*d)) {
       if (u->getAccess() == AS_public) {

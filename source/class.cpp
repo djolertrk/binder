@@ -8,7 +8,10 @@
 /// @brief  Binding generation for C++ struct and class objects
 /// @author Sergey Lyskov
 
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/Support/Casting.h"
 #include <class.hpp>
 #include <enum.hpp>
 #include <function.hpp>
@@ -76,6 +79,30 @@ string template_specialization(clang::CXXRecordDecl const *C) {
 // specialization if any
 string class_name(CXXRecordDecl const *C) {
   string res = standard_name(C->getNameAsString() + template_specialization(C));
+
+  const auto *parent = C->getParent();
+  if (parent) {
+    for(auto d = parent->decls_begin(); d != parent->decls_end(); ++d) {
+      if (auto *td = dyn_cast<TypedefDecl>(*d)) {
+
+//          llvm::outs() << "TypedefDecl: " << td->getNameAsString() << "\n"
+//            << td->getUnderlyingType().getAsString() << "\n"
+//            << C->getNameAsString() << "\n";
+
+          auto* und_decl = llvm::dyn_cast<CXXRecordDecl>(td->getUnderlyingDecl());
+
+          if (und_decl == C) { // TODO: Check why this isn't working. I rely on next if :(
+            res = standard_name(td->getNameAsString());
+            break;
+          }
+        //if (td->getUnderlyingType().getTypePtr() == C->getCanonicalDecl()->getTypeForDecl()) {
+        if (td->getUnderlyingType().getAsString() == res) { // C->getNameAsString()) {
+          res = standard_name(td->getNameAsString());
+          break;
+        }
+      }
+    }
+  }
 
   if (namespace_from_named_decl(C) == "std")
     res = simplify_std_class_name(res);

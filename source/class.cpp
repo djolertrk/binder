@@ -8,6 +8,7 @@
 /// @brief  Binding generation for C++ struct and class objects
 /// @author Sergey Lyskov
 
+#include "clang/Basic/Specifiers.h"
 #include <class.hpp>
 #include <enum.hpp>
 #include <function.hpp>
@@ -1157,8 +1158,9 @@ string binding_public_member_functions(CXXRecordDecl const *C,
         and !isa<CXXConstructorDecl>(*m) and !isa<CXXDestructorDecl>(*m) //
         and !is_const_overload(*m)) {                                    //
       //(*m)->dump();
-
-      c += bind_function("\tcl", *m, context);
+      if (C->getAccess() != clang::AS_protected && C->getAccess() != clang::AS_private) {
+        c += bind_function("\tcl", *m, context);
+      }
     }
   }
 

@@ -85,16 +85,17 @@ string class_name(CXXRecordDecl const *C) {
     for(auto d = parent->decls_begin(); d != parent->decls_end(); ++d) {
       if (auto *td = dyn_cast<TypedefDecl>(*d)) {
 
-//          llvm::outs() << "TypedefDecl: " << td->getNameAsString() << "\n"
-//            << td->getUnderlyingType().getAsString() << "\n"
-//            << C->getNameAsString() << "\n";
+        //  llvm::outs() << "**************************TypedefDecl: " << td->getNameAsString() << "\n"
+        //    << "====== " << td->getUnderlyingType().getAsString() << "\n"
+        //    << "====== " << C->getNameAsString() << "\n";
+        auto u_type = td->getUnderlyingType()->getCanonicalTypeInternal();
+        auto *und_decl_type = u_type->getAs<RecordType>();
+        auto *cdecl_type = C->getTypeForDecl();
+        if (und_decl_type == cdecl_type) {
+          res = standard_name(td->getNameAsString());
+          break;
+        }
 
-          auto* und_decl = llvm::dyn_cast<CXXRecordDecl>(td->getUnderlyingDecl());
-
-          if (und_decl == C) { // TODO: Check why this isn't working. I rely on next if :(
-            res = standard_name(td->getNameAsString());
-            break;
-          }
         //if (td->getUnderlyingType().getTypePtr() == C->getCanonicalDecl()->getTypeForDecl()) {
         if (td->getUnderlyingType().getAsString() == res) { // C->getNameAsString()) {
           res = standard_name(td->getNameAsString());

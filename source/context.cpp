@@ -167,6 +167,25 @@ void Context::add_insertion_operator(clang::FunctionDecl const *F) {
   insertion_operators[function_pointer_type(F)] = F;
 }
 
+void Context::add_type_to_cxxclassdecl(const clang::RecordType* RT, clang::CXXRecordDecl *D) {
+  CXXClassDeclToType[D] = RT;
+}
+void Context::add_typedef(const RecordType* RT, std::string Name) {
+  if (!TypeDefTypes.count(RT))
+    TypeDefTypes[RT] = Name;
+}
+
+std::optional<std::string> Context::get_typedef_name(clang::CXXRecordDecl *D) 
+{
+  if (CXXClassDeclToType.count(D)) {
+    const RecordType *RT = CXXClassDeclToType[D];
+    if (TypeDefTypes.count(RT)) {
+      return TypeDefTypes[RT]; 
+    }
+  }
+  return std::nullopt;
+}
+
 /// find global insertion operator for given type, return nullptr if not such
 /// operator find
 clang::FunctionDecl const *

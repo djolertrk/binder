@@ -47,6 +47,11 @@ public:
   /// generate unique trace line containing `info` to insert into the code
   std::string trace_line(std::string const &info);
 
+  /// those two are used to track the original name of the type defined with typedef
+  void add_type_to_cxxclassdecl(const clang::RecordType* RT, clang::CXXRecordDecl *D);
+  void add_typedef(const clang::RecordType* RT, std::string Name);
+  std::optional<std::string> get_typedef_name(clang::CXXRecordDecl *D);
+
 private:
   /// bind all objects residing in namespaces and their dependencies
   void bind(Config const &config);
@@ -80,6 +85,9 @@ private:
 
   /// counter to generate unique trace lines for debug
   int trace_counter = -1;
+  
+  std::unordered_map<const clang::RecordType*, std::string> TypeDefTypes;
+  std::unordered_map<clang::CXXRecordDecl*, const clang::RecordType*> CXXClassDeclToType;
 };
 
 } // namespace binder

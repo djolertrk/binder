@@ -114,7 +114,7 @@ private:
   /// describing them: , pybind11::base<BaseClass>()
   std::string maybe_base_classes(Context &context);
 
-  void generate_prefix_code();
+  void generate_prefix_code(binder::Context &context);
 
   // do for each nested public class
   void for_public_nested_classes(

@@ -77,9 +77,15 @@ public:
   std::vector<string> buffer_protocols, module_local_namespaces_to_add,
       module_local_namespaces_to_skip, smart_held_classes;
 
+  std::set<string> typedefs_to_add;
+
   std::map<string, string> const &binders() const { return binders_; }
   std::map<string, string> const &add_on_binders() const {
     return add_on_binders_;
+  }
+
+  bool should_bind_typedef(const std::string &s) {
+    return typedefs_to_add.count(s);
   }
 
   std::map<string, string> const &binder_for_namespaces() const {

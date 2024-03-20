@@ -77,31 +77,11 @@ string template_specialization(clang::CXXRecordDecl const *C) {
 
 // generate class name that could be used in bindings code indcluding template
 // specialization if any
-string class_name(CXXRecordDecl const *C) {
+string class_name(CXXRecordDecl const *C, binder::Context &ctx, bool avoid_type_def) {
   string res = standard_name(C->getNameAsString() + template_specialization(C));
-
-  const auto *parent = C->getParent();
-  if (parent) {
-    for(auto d = parent->decls_begin(); d != parent->decls_end(); ++d) {
-      if (auto *td = dyn_cast<TypedefDecl>(*d)) {
-
-        //  llvm::outs() << "**************************TypedefDecl: " << td->getNameAsString() << "\n"
-        //    << "====== " << td->getUnderlyingType().getAsString() << "\n"
-        //    << "====== " << C->getNameAsString() << "\n";
-        auto u_type = td->getUnderlyingType()->getCanonicalTypeInternal();
-        auto *und_decl_type = u_type->getAs<RecordType>();
-        auto *cdecl_type = C->getTypeForDecl();
-        if (und_decl_type == cdecl_type) {
-          res = standard_name(td->getNameAsString());
-          break;
-        }
-
-        //if (td->getUnderlyingType().getTypePtr() == C->getCanonicalDecl()->getTypeForDecl()) {
-        if (td->getUnderlyingType().getAsString() == res) { // C->getNameAsString()) {
-          res = standard_name(td->getNameAsString());
-          break;
-        }
-      }
+  if (!avoid_type_def) {
+    if (auto type_name_as_typedef = ctx.get_typedef_name(const_cast<CXXRecordDecl*>(C))) {
+        res = *type_name_as_typedef;
     }
   }
 
@@ -112,8 +92,9 @@ string class_name(CXXRecordDecl const *C) {
 }
 
 // generate string represetiong class name that could be used in python
-string python_class_name(CXXRecordDecl const *C) {
-  string name = class_name(C);
+string python_class_name(CXXRecordDecl const *C, binder::Context &ctx,
+  bool avoid_type_def = false) {
+  string name = class_name(C, ctx, avoid_type_def);
   return mangle_type_name(name);
 }
 
@@ -734,10 +715,10 @@ string binding_public_data_members(CXXRecordDecl const *C) {
 }
 
 // generate call-back structure name for given class
-inline string callback_structure_name(CXXRecordDecl const *C) {
+inline string callback_structure_name(CXXRecordDecl const *C, Context &context) {
   string ns = replace_(namespace_from_named_decl(C), "::", "_");
   return mangle_type_name("PyCallBack_" + (ns.empty() ? "" : ns + '_') +
-                              python_class_name(C),
+                              python_class_name(C, context, true),
                           false);
 }
 
@@ -857,7 +838,8 @@ if (overload) {{
 // generate call-back overloads for all public virtual functions in C including
 // it bases
 string
-bind_member_functions_for_call_back(CXXRecordDecl const *C,
+bind_member_functions_for_call_back(Context &context,
+                                    CXXRecordDecl const *C,
                                     string const &class_name,
                                     /*string const & base_type_alias,*/
                                     set<string> &binded, int &ret_id,
@@ -965,7 +947,7 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
           string input_args = std::get<1>(args);
           c += "\n\t\treturn {}<{},{}>(this, \"{}\", \"{}\""_format(
               custom_function_info, C->getNameAsString(),
-              callback_structure_name(C), class_name, m->getNameAsString());
+              callback_structure_name(C, context), class_name, m->getNameAsString());
           if (input_args.length() > 0)
             c += ", {}"_format(std::get<1>(args));
           c += ");\n";
@@ -1001,7 +983,7 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
         if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
           // add_relevant_includes(R, prefix_includes, prefix_includes_stack,
           // 0);
-          c += bind_member_functions_for_call_back(R, class_name,
+          c += bind_member_functions_for_call_back(context, R, class_name,
                                                    /*base_type_alias,*/ binded,
                                                    ret_id, prefix_includes_);
         }
@@ -1014,13 +996,13 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
 
 // Genarate code for defining 'call-back struct' that act as 'trampoline' and
 // allows overlading virtual functions in Python
-void ClassBinder::generate_prefix_code() {
+void ClassBinder::generate_prefix_code(Context &context) {
   if (!is_callback_structure_needed(C))
     return;
 
   prefix_code_ = generate_comment_for_declaration(C);
   prefix_code_ += "struct {0} : public {1} {{\n\tusing {1}::{2};\n\n"_format(
-      callback_structure_name(C), class_qualified_name(C),
+      callback_structure_name(C, context), class_qualified_name(C),
       C->getNameAsString());
 
   // string base_type_alias = "_binder_base_";
@@ -1029,7 +1011,7 @@ void ClassBinder::generate_prefix_code() {
 
   set<string> binded;
   int ret_id = 0;
-  prefix_code_ += bind_member_functions_for_call_back(
+  prefix_code_ += bind_member_functions_for_call_back(context,
       C, class_qualified_name(C), /*base_type_alias,*/ binded, ret_id,
       prefix_includes_);
   prefix_code_ += "};\n\n";
@@ -1254,7 +1236,7 @@ string bind_forward_declaration(CXXRecordDecl const *C, Context &context) {
   c += '\t' +
        R"(pybind11::class_<{}{}>({}, "{}");)"_format(
            qualified_name, maybe_holder_type, module_variable_name,
-           python_class_name(C)) +
+           python_class_name(C, context)) +
        "\n\n";
 
   return c;
@@ -1628,7 +1610,7 @@ void ClassBinder::bind(Context &context) {
   bool trampoline = callback_structure and callback_structure_constructible;
 
   if (trampoline)
-    generate_prefix_code();
+    generate_prefix_code(context);
 
   bool named_class = not C->isAnonymousStructOrUnion();
 
@@ -1655,9 +1637,9 @@ void ClassBinder::bind(Context &context) {
   // namespace_from_named_decl(C->getOuterLexicalRecordContext()) + "\n";
 
   string const trampoline_name =
-      callback_structure_constructible ? callback_structure_name(C) : "";
+      callback_structure_constructible ? callback_structure_name(C, context) : "";
   string const binding_qualified_name = callback_structure_constructible
-                                            ? callback_structure_name(C)
+                                            ? callback_structure_name(C, context)
                                             : qualified_name;
 
   string holder_type = Config::get().holder_type();
@@ -1699,7 +1681,7 @@ void ClassBinder::bind(Context &context) {
          R"(pybind11::class_<{}{}{}{}> cl({}, "{}", "{}"{});)"_format(
              qualified_name, maybe_holder_type, maybe_trampoline,
              maybe_base_classes(context), module_variable_name,
-             python_class_name(C),
+             python_class_name(C, context),
              generate_documentation_string_for_declaration(C),
              extra_annotation) +
          '\n';

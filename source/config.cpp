@@ -59,6 +59,7 @@ void Config::read(string const &file_name) {
   string const _class_{"class"};
   string const _field_{"field"};
   string const _enum_{"enum"};
+  string const _typedef_{"typedef"};
 
   string const _python_builtin_{"python_builtin"};
 
@@ -192,6 +193,9 @@ void Config::read(string const &file_name) {
         includes_to_add.push_back(name_without_spaces);
       else
         includes_to_skip.push_back(name_without_spaces);
+    } else if (token == _typedef_) {
+      if (bind)
+        typedefs_to_add.insert(name_without_spaces);
     } else if (token == _include_for_class_) {
 
       if (bind) {

@@ -93,6 +93,7 @@ const char *main_module_header = R"_(#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <iostream>
 
 {0}
 
@@ -128,6 +129,8 @@ PYBIND11_MODULE({2}, root_module) {{
 	//pybind11::class_<std::shared_ptr<void>>(M(""), "_encapsulated_data_");
 
 {4}
+
+{5}
 }}
 )_";
 
@@ -165,6 +168,25 @@ void Context::add(BinderOP &b) {
 
 void Context::add_insertion_operator(clang::FunctionDecl const *F) {
   insertion_operators[function_pointer_type(F)] = F;
+}
+
+void Context::add_type_to_cxxclassdecl(const clang::RecordType* RT, clang::CXXRecordDecl *D) {
+  CXXClassDeclToType[D] = RT;
+}
+void Context::add_typedef(const RecordType* RT, std::string Name) {
+  if (!TypeDefTypes.count(RT))
+    TypeDefTypes[RT] = Name;
+}
+
+std::optional<std::string> Context::get_typedef_name(clang::CXXRecordDecl *D) 
+{
+  if (CXXClassDeclToType.count(D)) {
+    const RecordType *RT = CXXClassDeclToType[D];
+    if (TypeDefTypes.count(RT)) {
+      return TypeDefTypes[RT]; 
+    }
+  }
+  return std::nullopt;
 }
 
 /// find global insertion operator for given type, return nullptr if not such
@@ -556,9 +578,48 @@ void Context::generate(Config const &config) {
   string const pybind11_include =
       "#include <" + Config::get().pybind11_include_file() + ">";
 
+  std::stringstream typedefs_str;
+
+  for (const auto& typedefs : TypeDefTypes) {
+    string typedef_name = typedefs.second;
+
+    llvm::outs() << "typedef_name: " << typedef_name << "\n";
+
+
+
+    for (const auto& class_decl : CXXClassDeclToType) {
+      if (class_decl.second == typedefs.first) {
+        string class_string_name = class_decl.first->getNameAsString();
+        string class_q_name = class_qualified_name(class_decl.first);
+//        llvm::outs() << "class_string_name: " << class_qualified_name << " typedef to " << typedef_name << "\n";
+
+        string pybind_name = mangle_type_name(class_name(class_decl.first));
+
+//        if (TypeDecl const *type_decl = dyn_cast<TypeDecl>(b->named_decl()))
+        //     types[typename_from_type_decl(type_decl)] = b;
+
+        auto t_from_type_decl = typename_from_type_decl(class_decl.first);
+
+        auto type_b = types.find(t_from_type_decl);
+
+        if (type_b != types.end()) {
+          auto b = type_b->second;
+          if (b->code().size()) { // this means that this class was binded            
+            typedefs_str << "try {\n";
+            typedefs_str << "std::cout << \"Binding " << typedef_name << " to " << pybind_name << "\\n\";\n";
+            typedefs_str << "M(\"QuantLib\").attr(\"" << typedef_name << "\") = M(\"QuantLib\").attr(\"" << pybind_name << "\");\n";
+            typedefs_str << "} catch (...) {\n";
+            typedefs_str << "std::cerr << \"Failed to bind " << typedef_name << " to " << pybind_name << "\\n\";\n";
+            typedefs_str << "}\n";
+          }
+        }
+      }
+    }
+  }
+
   std::stringstream s;
   s << fmt::format(main_module_header, pybind11_include, binding_function_decls,
-                   config.root_module, namespace_pairs, binding_function_calls);
+                   config.root_module, namespace_pairs, binding_function_calls, typedefs_str.str());
 
   root_module_file_handle << s.str();
 

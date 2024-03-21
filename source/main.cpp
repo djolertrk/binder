@@ -130,6 +130,11 @@ public:
       return true;
 
     if (binder::is_bindable(C)) {
+      auto *T = C->getTypeForDecl();
+      if (auto *RT = dyn_cast<RecordType>(T)) {
+        context.add_type_to_cxxclassdecl(RT, C);
+      }
+
       binder::BinderOP b = std::make_shared<binder::ClassBinder>(C);
       context.add(b);
     }
@@ -163,16 +168,27 @@ public:
   //     return true;
   // }
 
-  // virtual bool VisitTypedefDecl(TypedefDecl *T) {
-  // 	if( FullSourceLoc(T->getLocation(), ast_context->getSourceManager()
-  // ).isInSystemHeader() ) return true;
-  // 	//errs() << "Visit TypedefDecl: " << T->getQualifiedNameAsString() << "
-  // Type: " <<
-  // T->getUnderlyingType()->getCanonicalTypeInternal()/*getCanonicalType()*/.getAsString()
-  // << "\n";
-  // 	// record->dump();
-  //     return true;
-  // }
+  virtual bool VisitTypedefDecl(TypedefDecl *T) {
+  if(FullSourceLoc(
+      T->getLocation(), ast_context->getSourceManager()).isInSystemHeader())
+      return true;
+  
+    auto UType = T->getUnderlyingType()->getCanonicalTypeInternal();
+    if (auto *UUT = UType->getAs<RecordType>()) {
+      Config &config = Config::get();
+//      if (config.should_bind_typedef(T->getName().str()))
+          auto* ns =  dyn_cast<NamespaceDecl>(T->getDeclContext());
+
+          if (ns) {
+            auto ns_name = ns->getQualifiedNameAsString();
+            if (ns_name == "QuantLib") {
+              llvm::outs() << "Namespace: " << ns_name << " Typedef: " << T->getName().str() << "\n";
+              context.add_typedef(UUT, T->getName().str());
+            }
+          }
+     }
+    return true;
+  }
 
   // virtual bool VisitNamedDecl(NamedDecl *record) {
   // 	errs() << "Visit NamedRecord: " << record->getQualifiedNameAsString() <<

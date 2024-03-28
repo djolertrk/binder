@@ -59,6 +59,7 @@ void Config::read(string const &file_name) {
   string const _class_{"class"};
   string const _field_{"field"};
   string const _enum_{"enum"};
+  string const _typedef_{"typedef"};
 
   string const _python_builtin_{"python_builtin"};
 
@@ -192,6 +193,9 @@ void Config::read(string const &file_name) {
         includes_to_add.push_back(name_without_spaces);
       else
         includes_to_skip.push_back(name_without_spaces);
+    } else if (token == _typedef_) {
+      if (bind)
+        typedefs_to_add.insert(name_without_spaces);
     } else if (token == _include_for_class_) {
 
       if (bind) {
@@ -456,7 +460,7 @@ bool Config::is_function_skipping_requested(string const &function_) const {
       std::find(functions_to_skip.begin(), functions_to_skip.end(), function);
 
   if (bind != functions_to_skip.end()) {
-    DEBUG_LOG << "Skipping: " << function << "\n";
+    // outs() << "Skipping: " << function << "\n";
     return true;
   }
 
@@ -485,7 +489,7 @@ bool Config::is_class_skipping_requested(string const &class__) const {
   auto bind = std::find(classes_to_skip.begin(), classes_to_skip.end(), class_);
 
   if (bind != classes_to_skip.end()) {
-    DEBUG_LOG << " Skipping: " << class_ << "\n";
+    // outs() << "Skipping: " << class_ << "\n";
     return true;
   }
 
@@ -493,11 +497,8 @@ bool Config::is_class_skipping_requested(string const &class__) const {
 }
 
 bool Config::is_field_skipping_requested(string const &field_) const {
-  bool res = std::find(fields_to_skip.begin(), fields_to_skip.end(), field_) !=
+  return std::find(fields_to_skip.begin(), fields_to_skip.end(), field_) !=
          fields_to_skip.end();
-  if (res)
-    DEBUG_LOG << __FUNCTION__ << " Skipping: " << field_ << "\n";
-  return res;
 }
 
 bool Config::is_enum_binding_requested(string const &enum_) const {

@@ -8,8 +8,10 @@
 /// @brief  Binding generation for C++ struct and class objects
 /// @author Sergey Lyskov
 
-#include "binder.hpp"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/Support/Casting.h"
 #include <class.hpp>
 #include <enum.hpp>
 #include <function.hpp>
@@ -75,8 +77,13 @@ string template_specialization(clang::CXXRecordDecl const *C) {
 
 // generate class name that could be used in bindings code indcluding template
 // specialization if any
-string class_name(CXXRecordDecl const *C) {
+string class_name(CXXRecordDecl const *C, binder::Context &ctx, bool avoid_type_def) {
   string res = standard_name(C->getNameAsString() + template_specialization(C));
+  if (!avoid_type_def) {
+    if (auto type_name_as_typedef = ctx.get_typedef_name(const_cast<CXXRecordDecl*>(C))) {
+        res = *type_name_as_typedef;
+    }
+  }
 
   if (namespace_from_named_decl(C) == "std")
     res = simplify_std_class_name(res);
@@ -85,8 +92,9 @@ string class_name(CXXRecordDecl const *C) {
 }
 
 // generate string represetiong class name that could be used in python
-string python_class_name(CXXRecordDecl const *C) {
-  string name = class_name(C);
+string python_class_name(CXXRecordDecl const *C, binder::Context &ctx,
+  bool avoid_type_def = false) {
+  string name = class_name(C, ctx, avoid_type_def);
   return mangle_type_name(name);
 }
 
@@ -707,10 +715,10 @@ string binding_public_data_members(CXXRecordDecl const *C) {
 }
 
 // generate call-back structure name for given class
-inline string callback_structure_name(CXXRecordDecl const *C) {
+inline string callback_structure_name(CXXRecordDecl const *C, Context &context) {
   string ns = replace_(namespace_from_named_decl(C), "::", "_");
   return mangle_type_name("PyCallBack_" + (ns.empty() ? "" : ns + '_') +
-                              python_class_name(C),
+                              python_class_name(C, context, true),
                           false);
 }
 
@@ -830,7 +838,8 @@ if (overload) {{
 // generate call-back overloads for all public virtual functions in C including
 // it bases
 string
-bind_member_functions_for_call_back(CXXRecordDecl const *C,
+bind_member_functions_for_call_back(Context &context,
+                                    CXXRecordDecl const *C,
                                     string const &class_name,
                                     /*string const & base_type_alias,*/
                                     set<string> &binded, int &ret_id,
@@ -938,7 +947,7 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
           string input_args = std::get<1>(args);
           c += "\n\t\treturn {}<{},{}>(this, \"{}\", \"{}\""_format(
               custom_function_info, C->getNameAsString(),
-              callback_structure_name(C), class_name, m->getNameAsString());
+              callback_structure_name(C, context), class_name, m->getNameAsString());
           if (input_args.length() > 0)
             c += ", {}"_format(std::get<1>(args));
           c += ");\n";
@@ -974,7 +983,7 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
         if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
           // add_relevant_includes(R, prefix_includes, prefix_includes_stack,
           // 0);
-          c += bind_member_functions_for_call_back(R, class_name,
+          c += bind_member_functions_for_call_back(context, R, class_name,
                                                    /*base_type_alias,*/ binded,
                                                    ret_id, prefix_includes_);
         }
@@ -987,13 +996,13 @@ bind_member_functions_for_call_back(CXXRecordDecl const *C,
 
 // Genarate code for defining 'call-back struct' that act as 'trampoline' and
 // allows overlading virtual functions in Python
-void ClassBinder::generate_prefix_code() {
+void ClassBinder::generate_prefix_code(Context &context) {
   if (!is_callback_structure_needed(C))
     return;
 
   prefix_code_ = generate_comment_for_declaration(C);
   prefix_code_ += "struct {0} : public {1} {{\n\tusing {1}::{2};\n\n"_format(
-      callback_structure_name(C), class_qualified_name(C),
+      callback_structure_name(C, context), class_qualified_name(C),
       C->getNameAsString());
 
   // string base_type_alias = "_binder_base_";
@@ -1002,7 +1011,7 @@ void ClassBinder::generate_prefix_code() {
 
   set<string> binded;
   int ret_id = 0;
-  prefix_code_ += bind_member_functions_for_call_back(
+  prefix_code_ += bind_member_functions_for_call_back(context,
       C, class_qualified_name(C), /*base_type_alias,*/ binded, ret_id,
       prefix_includes_);
   prefix_code_ += "};\n\n";
@@ -1013,9 +1022,7 @@ string cpp_python_operator(const FunctionDecl &F);
 string binding_public_member_functions(CXXRecordDecl const *C,
                                        bool callback_structure,
                                        bool callback_structure_constructible,
-                                       Context &context,
-                                       std::vector<clang::CXXRecordDecl const *>& deps
-                                       ) {
+                                       Context &context) {
   string c;
   // binding protected/private member functions that was made public in
   // child class by 'using' declaration
@@ -1163,15 +1170,6 @@ string binding_public_member_functions(CXXRecordDecl const *C,
       //(*m)->dump();
       if (C->getAccess() != clang::AS_protected && C->getAccess() != clang::AS_private) {
         c += bind_function("\tcl", *m, context);
-        for (int param_i = 0; param_i < m->getNumParams(); param_i++) {
-          auto param = m->getParamDecl(param_i);
-          if (param->hasDefaultArg() && !param->hasUninstantiatedDefaultArg()) {
-            auto arg_cxx_decl = param->getDefaultArg()->getType()->getAsCXXRecordDecl();
-            if (arg_cxx_decl) {
-              deps.push_back(arg_cxx_decl);
-            }
-          }
-        }
       }
     }
   }
@@ -1194,10 +1192,9 @@ string binding_template_bases(CXXRecordDecl const *C, bool callback_structure,
           if (CXXRecordDecl *R = cast<CXXRecordDecl>(rt->getDecl())) {
             if (!is_skipping_requested(R, Config::get())) {
               c += binding_public_data_members(R);
-              std::vector<clang::CXXRecordDecl const *> deps;
               c += binding_public_member_functions(
                   R, callback_structure, callback_structure_constructible,
-                  context, deps);
+                  context);
               c += binding_template_bases(R, callback_structure,
                                           callback_structure_constructible,
                                           context);
@@ -1236,11 +1233,10 @@ string bind_forward_declaration(CXXRecordDecl const *C, Context &context) {
       maybe_holder_type = ", " + qualified_name + '*';
   }
 
-  c += "\t using namespace QuantLib;\n";
   c += '\t' +
        R"(pybind11::class_<{}{}>({}, "{}");)"_format(
            qualified_name, maybe_holder_type, module_variable_name,
-           python_class_name(C)) +
+           python_class_name(C, context)) +
        "\n\n";
 
   return c;
@@ -1505,9 +1501,6 @@ string bind_constructor(ConstructorBindingInfo const &CBI) {
       break;
   }
 
-  DEBUG_LOG << "Binding constructor: " << CBI.T->getNameAsString() << " with "
-            << args_to_bind << " fixed arguments and " << CBI.T->getNumParams() << " total\n";
-            
   for (; args_to_bind <= CBI.T->getNumParams(); ++args_to_bind)
     code += bind_constructor(CBI, args_to_bind,
                              args_to_bind == CBI.T->getNumParams()) +
@@ -1597,10 +1590,6 @@ void ClassBinder::bind(Context &context) {
     return;
 
   string const qualified_name = class_qualified_name(C);
-  outs() << "Binding class: " << qualified_name << "\n";
-  if (qualified_name == "QuantLib::XabrSwaptionVolatilityCube<QuantLib::SwaptionVolCubeSabrModel>") {
-    outs() << "Binding class: " << qualified_name << "\n"; 
-  }
   string const qualified_name_without_template =
       standard_name(C->getQualifiedNameAsString());
 
@@ -1609,7 +1598,6 @@ void ClassBinder::bind(Context &context) {
 
   std::map<string, string> const &external_binders = Config::get().binders();
   if (external_binders.count(qualified_name_without_template)) {
-    DEBUG_LOG << "Using external binder for " << qualified_name << "\n";
     bind_with(external_binders.at(qualified_name_without_template), context);
     return;
   }
@@ -1622,7 +1610,7 @@ void ClassBinder::bind(Context &context) {
   bool trampoline = callback_structure and callback_structure_constructible;
 
   if (trampoline)
-    generate_prefix_code();
+    generate_prefix_code(context);
 
   bool named_class = not C->isAnonymousStructOrUnion();
 
@@ -1642,18 +1630,16 @@ void ClassBinder::bind(Context &context) {
   // c += " // getQualifiedNameAsString: {}{}\n"_format(
   // C->getQualifiedNameAsString(), template_specialization(C) );
 
-  if (C->isCXXClassMember() and named_class) {
-    DEBUG_LOG << qualified_name << " is enclosed\n";
+  if (C->isCXXClassMember() and named_class)
     c += "\tauto & enclosing_class = cl;\n";
-  }
 
   // c += "// namespace: " +
   // namespace_from_named_decl(C->getOuterLexicalRecordContext()) + "\n";
 
   string const trampoline_name =
-      callback_structure_constructible ? callback_structure_name(C) : "";
+      callback_structure_constructible ? callback_structure_name(C, context) : "";
   string const binding_qualified_name = callback_structure_constructible
-                                            ? callback_structure_name(C)
+                                            ? callback_structure_name(C, context)
                                             : qualified_name;
 
   string holder_type = Config::get().holder_type();
@@ -1684,7 +1670,6 @@ void ClassBinder::bind(Context &context) {
       module_local_annotation + buffer_protocol_annotation;
 
   if (named_class) {
-    DEBUG_LOG << " named_class:" << named_class << "\n";
     if (Config::get().is_smart_holder_requested(
             qualified_name_without_template)) {
       c += '\t' +
@@ -1692,51 +1677,35 @@ void ClassBinder::bind(Context &context) {
                qualified_name, maybe_holder_type) +
            '\n';
     }
-    c += "\t using namespace QuantLib;\n";
     c += '\t' +
          R"(pybind11::class_<{}{}{}{}> cl({}, "{}", "{}"{});)"_format(
              qualified_name, maybe_holder_type, maybe_trampoline,
              maybe_base_classes(context), module_variable_name,
-             python_class_name(C),
+             python_class_name(C, context),
              generate_documentation_string_for_declaration(C),
              extra_annotation) +
          '\n';
-    c += bind_nested_classes(context);
   }
-
   // c += "\tpybind11::handle cl_type = cl;\n\n";
 
   // if( C->isAbstract()  and  callback_structure) c +=
   // "\tcl.def(pybind11::init<>());\n";
 
-  DEBUG_LOG << qualified_name << " has_definition:" << (C->getDefinition() != nullptr);
-  if (C->getDefinition() != nullptr) DEBUG_LOG << " is_abstract:" << C->isAbstract();
-   DEBUG_LOG << " callback: " << callback_structure_constructible
-            << " named_class:" << named_class << "\n";
-
-  if (((C->getDefinition() and !C->isAbstract()) or
+  if ((C->getDefinition() and !C->isAbstract() or
        callback_structure_constructible) and
       named_class) {
     bool default_constructor_processed = false;
     // bool copy_constructor_processed = false;
 
-    DEBUG_LOG << "Binding constructors for " << qualified_name << "\n";
     string constructors;
     for (auto t = C->ctor_begin(); t != C->ctor_end(); ++t) {
       const auto &ctor = *t;
-      DEBUG_LOG << "Processing constructor: " << ctor->getQualifiedNameAsString() << "(";
-      for (int i = 0; i < ctor->getNumParams(); i++) {
-        DEBUG_LOG_MORE << ctor->getParamDecl(i)->getType().getAsString() << " ";
-      }
-      DEBUG_LOG_MORE << ")\n";
       if (ctor->isDeleted())
         continue;
-      DEBUG_LOG << ctor->getAccess() << " " << ctor->isMoveConstructor() << " " << is_bindable(*t) << " " << !is_skipping_requested(*t, Config::get()) << "\n";
       if (t->getAccess() == AS_public and !t->isMoveConstructor() and
           is_bindable(*t) and
           !is_skipping_requested(
               *t, Config::get()) /*and  t->doesThisDeclarationHaveABody()*/) {
-        DEBUG_LOG << "Binding constructor: " << t->getNameAsString() << "\n";                
         ConstructorBindingInfo CBI = {
             C, *t, trampoline, qualified_name, trampoline_name, context};
 
@@ -1749,10 +1718,8 @@ void ClassBinder::bind(Context &context) {
         } else if (t->isDefaultConstructor() and t->getNumParams() == 0)
           constructors += bind_default_constructor(
               CBI); // workaround for Pybind11-2.2 issues
-        else {
-          DEBUG_LOG << "Binding constructor: " << t->getNameAsString() << "\n";
+        else
           constructors += bind_constructor(CBI);
-        }
       }
       if (t->isDefaultConstructor())
         default_constructor_processed = true;
@@ -1841,7 +1808,7 @@ void ClassBinder::bind(Context &context) {
 
   c += binding_public_data_members(C);
   c += binding_public_member_functions(
-      C, callback_structure, callback_structure_constructible, context, dependencies_);
+      C, callback_structure, callback_structure_constructible, context);
 
   c += binding_template_bases(C, callback_structure,
                               callback_structure_constructible, context);
@@ -1854,7 +1821,7 @@ void ClassBinder::bind(Context &context) {
     c += "\n\t{}(cl);\n"_format(
         external_add_on_binders.at(qualified_name_without_template));
 
-//  c += bind_nested_classes(context);
+  c += bind_nested_classes(context);
 
   c += "}\n";
 

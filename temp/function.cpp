@@ -19,7 +19,6 @@
 #include <clang/AST/DeclCXX.h>
 
 #include <clang/AST/ExprCXX.h>
-#include <clang/Lex/Lexer.h>
 
 // #include <tsl/robin_map.h>
 
@@ -75,7 +74,7 @@ string cpp_python_operator(const FunctionDecl &F) {
       {"operator++", {"pre_increment", "post_increment"}}, //
       {"operator--", {"pre_decrement", "post_decrement"}}, //
 
-      {"operator->", {"__deref__"}}, //
+      {"operator->", {"__follow__"}}, //
       {"operator<", {"__lt__"}}, //
       {"operator>", {"__gt__"}}, //
       {"operator<=", {"__le__"}}, //
@@ -324,15 +323,10 @@ vector<QualType> get_type_dependencies(FunctionDecl const *F) {
   vector<QualType> r;
 
   r.push_back(F->getReturnType()); //.getDesugaredType(F->getASTContext()) );
-  for (uint i = 0; i < F->getNumParams(); ++i) {
+  for (uint i = 0; i < F->getNumParams(); ++i)
     r.push_back(
         F->getParamDecl(i)
             ->getOriginalType() /*.getDesugaredType(F->getASTContext())*/);
-
-    if (F->getParamDecl(i)->hasDefaultArg() and !F->getParamDecl(i)->hasUninstantiatedDefaultArg()) {
-      r.push_back(F->getParamDecl(i)->getDefaultArg()->getType());
-    }
-  }
 
   // if( F->getTemplatedKind() == FunctionDecl::TK_MemberSpecialization  or
   // F->getTemplatedKind() == FunctionDecl::TK_FunctionTemplateSpecialization )
@@ -372,22 +366,16 @@ bool is_skipping_requested(FunctionDecl const *F, Config const &config) {
       function_qualified_name(F, true);
 
   if (config.is_function_skipping_requested(
-          qualified_name_with_args_info_and_template_specialization)) {
-    DEBUG_LOG << "Skipping requested for: "
-              << qualified_name_with_args_info_and_template_specialization
-              << '\n';
+          qualified_name_with_args_info_and_template_specialization))
     return true; // qualified function name + parameter and template info was
-  }
                  // requested for skipping
   if (config.is_function_binding_requested(
           qualified_name_with_args_info_and_template_specialization))
     return false; // qualified function name + parameter and template info was
                   // requested for binding
 
-  if (config.is_function_skipping_requested(qualified_name)) {
-    DEBUG_LOG << "Skipping requested for: " << qualified_name_with_args_info_and_template_specialization << '\n';
+  if (config.is_function_skipping_requested(qualified_name))
     return true; // qualified function name was requested for skipping
-  }
   if (config.is_function_binding_requested(qualified_name))
     return false; // qualified function name was requested for binding
 
@@ -413,13 +401,8 @@ bool is_skipping_requested(FunctionDecl const *F, Config const &config) {
   }
   // outs() << "OK\n";
 
-  for (auto &t : get_type_dependencies(F)) {
-    bool skip_this = is_skipping_requested(t, config);
-    if (skip_this) {
-      DEBUG_LOG << "Skipping requested for type dependency (argument): " << standard_name(t) << " func:" << qualified_name_with_args_info_and_template_specialization << '\n';
-    }
-    skip |= skip_this;
-  }
+  for (auto &t : get_type_dependencies(F))
+    skip |= is_skipping_requested(t, config);
 
   return skip;
 }
@@ -532,9 +515,9 @@ string bind_function(FunctionDecl const *F, uint args_to_bind,
   // string r = R"(.def{}("{}", ({}) &{}{}, "doc")"_format(maybe_static,
   // function_name, function_pointer_type(F), function_qualified_name,
   // template_specialization(F));
-  string r = R"(.def{}("{}", {}, "{}"{})"_format(maybe_static, function_name, function,
+  string r =
+      R"(.def{}("{}", {}, "{}"{})"_format(maybe_static, function_name, function,
                                           documentation, maybe_return_policy);
-
 
   if (request_bindings_f)
     request_bindings(F->getReturnType().getCanonicalType(), context);
@@ -542,21 +525,6 @@ string bind_function(FunctionDecl const *F, uint args_to_bind,
   for (uint i = 0; i < F->getNumParams() and i < args_to_bind; ++i) {
     r +=
         ", pybind11::arg(\"{}\")"_format(string(F->getParamDecl(i)->getName()));
-
-    if (
-      F->getParamDecl(i)->hasDefaultArg()
-      && !F->getParamDecl(i)->hasUninstantiatedDefaultArg()
-    ) {
-      r += " = ";
-      auto def_arg_expr = F->getParamDecl(i)->getDefaultArg();
-      ASTContext &ast_context(F->getASTContext());
-      SourceManager &sm(ast_context.getSourceManager());
-      auto arg_init_text = Lexer::getSourceText(
-          CharSourceRange::getTokenRange(def_arg_expr->getSourceRange()),
-          sm, ast_context.getLangOpts(), 0);
-      r += arg_init_text.str();
-    }
-    
 
     if (request_bindings_f)
       request_bindings(F->getParamDecl(i)->getOriginalType(), context);
@@ -686,8 +654,6 @@ bool is_bindable(FunctionDecl const *F) {
     return it->second;
   else {
     bool r = is_bindable_raw(F);
-    if (!r) DEBUG_LOG << F->getQualifiedNameAsString() << " is not bindable\n";
-    
     cache.insert({F, r});
     return r;
   }

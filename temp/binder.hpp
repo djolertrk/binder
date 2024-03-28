@@ -22,9 +22,6 @@
 #include <unordered_map>
 #include <vector>
 
-#define DEBUG_LOG if(1) llvm::errs() << __FILE__ << ":" << __LINE__ << " " << __FUNCTION__ << " "
-#define DEBUG_LOG_MORE if(1) llvm::errs() 
-
 namespace binder {
 
 class Config;

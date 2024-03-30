@@ -174,19 +174,8 @@ void Context::add_type_to_cxxclassdecl(const clang::RecordType* RT, clang::CXXRe
   CXXClassDeclToType[D] = RT;
 }
 void Context::add_typedef(const RecordType* RT, std::string Name) {
-  if (!TypeDefTypes.count(RT))
-    TypeDefTypes[RT] = Name;
-}
-
-std::optional<std::string> Context::get_typedef_name(clang::CXXRecordDecl *D) 
-{
-  if (CXXClassDeclToType.count(D)) {
-    const RecordType *RT = CXXClassDeclToType[D];
-    if (TypeDefTypes.count(RT)) {
-      return TypeDefTypes[RT]; 
-    }
-  }
-  return std::nullopt;
+//  if (!TypeDefTypes.count(RT))
+    TypeDefTypes.push_back({RT, Name});
 }
 
 /// find global insertion operator for given type, return nullptr if not such

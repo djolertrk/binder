@@ -21,6 +21,7 @@
 
 #include <clang/AST/DeclTemplate.h>
 // #include <clang/AST/TemplateBase.h>
+#include <clang/Lex/Lexer.h>
 
 using namespace llvm;
 using namespace clang;
@@ -1359,6 +1360,21 @@ string bind_constructor(ConstructorBindingInfo const &CBI, uint args_to_bind,
       c += ", pybind11::arg(\"{}\")"_format(
           string(CBI.T->getParamDecl(i)->getName()));
 
+      if (
+        CBI.T->getParamDecl(i)->hasDefaultArg()
+        && !CBI.T->getParamDecl(i)->hasUninstantiatedDefaultArg()
+        && CBI.T->getParamDecl(i)->getDefaultArg()->getType()->isBuiltinType()
+      ) {
+        c += " = ";
+        auto def_arg_expr = CBI.T->getParamDecl(i)->getDefaultArg();
+        ASTContext &ast_context(CBI.T->getASTContext());
+        SourceManager &sm(ast_context.getSourceManager());
+        auto arg_init_text = Lexer::getSourceText(
+            CharSourceRange::getTokenRange(def_arg_expr->getSourceRange()),
+            sm, ast_context.getLangOpts(), 0);
+        c += arg_init_text.str();
+      }
+          
       if (request_bindings_f)
         request_bindings(CBI.T->getParamDecl(i)->getOriginalType(),
                          CBI.context);

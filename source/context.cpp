@@ -595,10 +595,10 @@ void Context::generate(Config const &config) {
           auto b = type_b->second;
           if (b->code().size()) { // this means that this class was binded            
             typedefs_str << "try {\n";
-            typedefs_str << "std::cout << \"Binding " << typedef_name << " to " << pybind_name << "\\n\";\n";
+//            typedefs_str << "std::cout << \"Binding " << typedef_name << " to " << pybind_name << "\\n\";\n";
             typedefs_str << "M(\"QuantLib\").attr(\"" << typedef_name << "\") = M(\"QuantLib\").attr(\"" << pybind_name << "\");\n";
             typedefs_str << "} catch (...) {\n";
-            typedefs_str << "std::cerr << \"Failed to bind " << typedef_name << " to " << pybind_name << "\\n\";\n";
+//            typedefs_str << "std::cerr << \"Failed to bind " << typedef_name << " to " << pybind_name << "\\n\";\n";
             typedefs_str << "}\n";
           }
         }
